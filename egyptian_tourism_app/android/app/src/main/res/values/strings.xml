@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Bazar</string>
+    <string name="facebook_app_id">1464688777932710</string>
+    <string name="fb_login_protocol_scheme">fb1464688777932710</string>
+    <string name="facebook_client_token">CLIENT_TOKEN</string> 
+</resources>

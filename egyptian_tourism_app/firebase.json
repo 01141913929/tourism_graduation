@@ -1,0 +1,29 @@
+{
+  "firestore": {
+    "rules": "firestore.rules",
+    "indexes": "firestore.indexes.json"
+  },
+  "flutter": {
+    "platforms": {
+      "android": {
+        "default": {
+          "projectId": "egyptian-tourism-app",
+          "appId": "1:730644883494:android:ed9fe724e4422c795c5ee7",
+          "fileOutput": "android/app/google-services.json"
+        }
+      },
+      "dart": {
+        "lib/firebase_options.dart": {
+          "projectId": "egyptian-tourism-app",
+          "configurations": {
+            "android": "1:730644883494:android:ed9fe724e4422c795c5ee7",
+            "ios": "1:730644883494:ios:c1760e878549411f5c5ee7",
+            "macos": "1:730644883494:ios:c1760e878549411f5c5ee7",
+            "web": "1:730644883494:web:f8847dbb274019285c5ee7",
+            "windows": "1:730644883494:web:0d28d9dfbe8f1e575c5ee7"
+          }
+        }
+      }
+    }
+  }
+}

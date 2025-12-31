@@ -1,0 +1,425 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // ===== Helper Functions =====
+    
+    // Check if the user is authenticated
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+    
+    // Check if the user owns this document (by uid)
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+    
+    // Get user document
+    function getUserData() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    
+    // Check if user is a super admin
+    function isSuperAdmin() {
+      return isAuthenticated() && getUserData().role == 'superAdmin';
+    }
+    
+    // Check if user is a bazaar owner
+    function isBazaarOwner() {
+      return isAuthenticated() && getUserData().role == 'bazaarOwner';
+    }
+    
+    // Get user's bazaar ID
+    function getUserBazaarId() {
+      return getUserData().bazaarId;
+    }
+    
+    // Check if user owns a specific bazaar
+    function ownsBazaar(bazaarId) {
+      return isAuthenticated() && getUserData().bazaarId == bazaarId;
+    }
+    
+    // ===== Users Collection =====
+    match /users/{userId} {
+      // Users can read their own profile
+      allow read: if isOwner(userId);
+      
+      // Users can create their own profile during signup
+      allow create: if isOwner(userId);
+      
+      // Users can update their own profile (but not change role)
+      allow update: if isOwner(userId) && 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'bazaarId', 'applicationStatus']));
+      
+      // Only super admin can delete users
+      allow delete: if isSuperAdmin();
+      
+      // Super admin can read all users
+      allow read: if isSuperAdmin();
+      
+      // Super admin can update user roles
+      allow update: if isSuperAdmin();
+      
+      // Addresses subcollection
+      match /addresses/{addressId} {
+        allow read, write: if isOwner(userId);
+      }
+      
+      // Payment methods subcollection (snake_case to match app)
+      match /payment_methods/{methodId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // ===== Products Collection =====
+    match /products/{productId} {
+      // Anyone can read products (public catalog)
+      allow read: if true;
+      
+      // Only bazaar owners can create products for their bazaar
+      allow create: if isBazaarOwner() && 
+        request.resource.data.bazaarId == getUserBazaarId();
+      
+      // Bazaar owners can update their own products
+      allow update: if isBazaarOwner() && 
+        resource.data.bazaarId == getUserBazaarId();
+      
+      // Bazaar owners can delete their own products
+      allow delete: if isBazaarOwner() && 
+        resource.data.bazaarId == getUserBazaarId();
+      
+      // Super admin has full access
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Bazaars Collection =====
+    match /bazaars/{bazaarId} {
+      // Anyone can read bazaars (public listing)
+      allow read: if true;
+      
+      // Only super admin can create bazaars
+      allow create: if isSuperAdmin();
+      
+      // Bazaar owner can update their own bazaar (limited fields)
+      allow update: if ownsBazaar(bazaarId) && 
+        (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['ownerUserId', 'isVerified']));
+      
+      // Super admin has full access
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Orders Collection (Parent Orders) =====
+    match /orders/{orderId} {
+      // FIXED: Allow authenticated users to LIST their own orders (query by userId)
+      // This allows queries with where('userId', '==', uid)
+      allow list: if isAuthenticated() && 
+        request.query.limit <= 100;
+      
+      // Users can read their own orders by ID
+      allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users can create orders for themselves
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Users cannot update orders (only through admin)
+      allow update: if isSuperAdmin();
+      
+      // Super admin can read all orders
+      allow read: if isSuperAdmin();
+      
+      // No one can delete orders (for audit trail)
+      allow delete: if false;
+    }
+    
+    // ===== Sub Orders Collection =====
+    match /subOrders/{subOrderId} {
+      // FIXED: Allow authenticated users to LIST sub-orders
+      // This enables queries with where('customerId', '==', uid) or where('bazaarId', '==', bazaarId)
+      allow list: if isAuthenticated();
+      
+      // Customers can read their own sub-orders by ID
+      allow get: if isAuthenticated() && resource.data.customerId == request.auth.uid;
+      
+      // Bazaar owners can read sub-orders for their bazaar by ID
+      allow get: if isBazaarOwner() && resource.data.bazaarId == getUserBazaarId();
+      
+      // Sub-orders are created by the system (via order creation)
+      allow create: if isAuthenticated() && request.resource.data.customerId == request.auth.uid;
+      
+      // FIXED: Bazaar owners can update status of their sub-orders (added 'qrCode')
+      allow update: if isBazaarOwner() && 
+        resource.data.bazaarId == getUserBazaarId() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status', 'rejectionReason', 'qrScanned', 'scannedAt', 
+          'acceptedAt', 'preparedAt', 'shippedAt', 'deliveredAt', 'qrCode'
+        ]);
+      
+      // NEW: Customers can cancel their own pending orders
+      allow update: if isAuthenticated() && 
+        resource.data.customerId == request.auth.uid &&
+        resource.data.status == 'pending' &&
+        request.resource.data.status == 'cancelled' &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status', 'cancelledAt']);
+      
+      // Super admin has full access
+      allow read, write: if isSuperAdmin();
+      
+      // No deletion
+      allow delete: if false;
+    }
+    
+    // ===== Cart Collection =====
+    match /carts/{userId} {
+      allow read, write: if isOwner(userId);
+      
+      match /items/{itemId} {
+        allow read, write: if isOwner(userId);
+      }
+    }
+    
+    // ===== Artifacts Collection =====
+    match /artifacts/{artifactId} {
+      // Anyone can read artifacts (public museum items)
+      allow read: if true;
+      
+      // Only super admin can manage artifacts
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Reviews Collection =====
+    match /reviews/{reviewId} {
+      // Anyone can read reviews
+      allow read: if true;
+      
+      // Authenticated users can create reviews
+      allow create: if isAuthenticated() && 
+        request.resource.data.userId == request.auth.uid;
+      
+      // Users can update their own reviews
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      
+      // Bazaar owners can reply to reviews on their products/bazaar
+      allow update: if isBazaarOwner() && 
+        (resource.data.bazaarId == getUserBazaarId() || resource.data.targetId == getUserBazaarId()) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replyText', 'replyAt']);
+      
+      // Users can delete their own reviews
+      allow delete: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid;
+      
+      // Super admin can manage all reviews
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Coupons Collection =====
+    match /coupons/{couponId} {
+      // Authenticated users can read coupons
+      allow read: if isAuthenticated();
+      
+      // Only super admin or bazaar owners can create coupons
+      allow create: if isSuperAdmin() || 
+        (isBazaarOwner() && request.resource.data.bazaarId == getUserBazaarId());
+      
+      // Bazaar owners can update their own coupons
+      allow update: if isBazaarOwner() && 
+        resource.data.bazaarId == getUserBazaarId();
+      
+      // Bazaar owners can delete their own coupons
+      allow delete: if isBazaarOwner() && 
+        resource.data.bazaarId == getUserBazaarId();
+      
+      // Super admin has full access
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Messages Collection (Customer to Bazaar) =====
+    match /messages/{messageId} {
+      // FIXED: Allow list queries for messages
+      allow list: if isAuthenticated();
+      
+      // Customers can read their own messages
+      allow get: if isAuthenticated() && resource.data.customerId == request.auth.uid;
+      
+      // Bazaar owners can read messages sent to their bazaar
+      allow get: if isBazaarOwner() && resource.data.bazaarId == getUserBazaarId();
+      
+      // Customers can create messages
+      allow create: if isAuthenticated() && 
+        request.resource.data.customerId == request.auth.uid;
+      
+      // Customers can update their own messages (add replies)
+      allow update: if isAuthenticated() &&
+        resource.data.customerId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['replies', 'lastMessageAt', 'status']);
+      
+      // Bazaar owners can update messages (mark as read, reply)
+      allow update: if isBazaarOwner() && 
+        resource.data.bazaarId == getUserBazaarId() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt', 'reply', 'repliedAt', 'replies', 'lastMessageAt', 'status']);
+      
+      // Super admin has full access
+      allow read, write: if isSuperAdmin();
+      
+      // No deletion
+      allow delete: if false;
+    }
+    
+    // ===== Order Chats Collection =====
+    match /orderChats/{chatId} {
+      // Customers can list/read their own order chats
+      allow list: if isAuthenticated();
+      allow get: if isAuthenticated() && 
+        (resource.data.customerId == request.auth.uid || 
+         (isBazaarOwner() && resource.data.bazaarId == getUserBazaarId()));
+      
+      // Both parties can create order chats
+      allow create: if isAuthenticated();
+      
+      // Both parties can update the chat metadata
+      allow update: if isAuthenticated() && 
+        (resource.data.customerId == request.auth.uid || 
+         (isBazaarOwner() && resource.data.bazaarId == getUserBazaarId()));
+      
+      // Super admin has full access
+      allow read, write: if isSuperAdmin();
+      
+      // Messages subcollection
+      match /messages/{messageId} {
+        allow read: if isAuthenticated() && 
+          (get(/databases/$(database)/documents/orderChats/$(chatId)).data.customerId == request.auth.uid ||
+           (isBazaarOwner() && get(/databases/$(database)/documents/orderChats/$(chatId)).data.bazaarId == getUserBazaarId()));
+        
+        allow create: if isAuthenticated();
+        
+        allow update: if isAuthenticated() && 
+          request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead']);
+        
+        allow read, write: if isSuperAdmin();
+      }
+    }
+    
+    // ===== Audit Logs Collection =====
+    match /auditLogs/{logId} {
+      // Only super admin can read audit logs
+      allow read: if isSuperAdmin();
+      
+      // System can write audit logs (authenticated users)
+      allow create: if isAuthenticated();
+      
+      // Super admin can update
+      allow update: if isSuperAdmin();
+      
+      // No deletion (for audit trail integrity)
+      allow delete: if false;
+    }
+    
+    // ===== Bazaar Applications Collection =====
+    match /bazaarApplications/{applicationId} {
+      // Applicant can read their own application
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Authenticated user can create application for themselves
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Super Admin has full access
+      allow read, write: if isSuperAdmin();
+      
+      // No deletion (for archive)
+      allow delete: if false;
+    }
+    
+    // ===== Categories Collection =====
+    match /categories/{categoryId} {
+      // Anyone can read categories
+      allow read: if true;
+      
+      // Only super admin can manage categories
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Exhibition Halls Collection =====
+    match /exhibitionHalls/{hallId} {
+      // Anyone can read halls
+      allow read: if true;
+      
+      // Only super admin can manage halls
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Favorites Collection =====
+    match /favorites/{favoriteId} {
+      // Users can read/write their own favorites
+      allow read, write: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+    }
+    
+    // ===== Settings Collection (Platform Configuration) =====
+    match /settings/{settingId} {
+      // Only super admin can read settings
+      allow read: if isSuperAdmin();
+      
+      // Only super admin can write settings
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Notifications Collection =====
+    match /notifications/{notificationId} {
+      // Users can read their own notifications
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // System/Super admin can create notifications
+      allow create: if isAuthenticated();
+      
+      // Users can update their own notifications (mark as read)
+      allow update: if isAuthenticated() && 
+        resource.data.userId == request.auth.uid &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+      
+      // Users can delete their own notifications
+      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Super admin has full access
+      allow read, write: if isSuperAdmin();
+    }
+    
+    // ===== Admin Notifications Collection =====
+    match /adminNotifications/{notificationId} {
+      // Bazaar owners can read their own notifications
+      allow read: if isBazaarOwner() && resource.data.targetBazaarId == getUserBazaarId();
+      allow list: if isBazaarOwner();
+      
+      // Super admin can create/manage notifications
+      allow read, write: if isSuperAdmin();
+      
+      // Bazaar owners can mark as read
+      allow update: if isBazaarOwner() && 
+        resource.data.targetBazaarId == getUserBazaarId() &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['isRead', 'readAt']);
+    }
+    
+    // ===== Complaints Collection =====
+    match /complaints/{complaintId} {
+      // Users can read their own complaints
+      allow read: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      
+      // Users can create complaints
+      allow create: if isAuthenticated() && request.resource.data.userId == request.auth.uid;
+      
+      // Super admin has full access
+      allow read, write: if isSuperAdmin();
+    }
+    
+    // ===== Banners Collection =====
+    match /banners/{bannerId} {
+      // Anyone can read active banners
+      allow read: if true;
+      
+      // Only super admin can manage banners
+      allow write: if isSuperAdmin();
+    }
+    
+    // ===== Commission Settings (in settings collection) =====
+    // Already covered by settings collection rules above
+  }
+}

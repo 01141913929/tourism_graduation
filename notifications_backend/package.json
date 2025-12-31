@@ -1,0 +1,12 @@
+{
+    "name": "egyptian-tourism-notifications",
+    "version": "1.0.0",
+    "description": "Serverless notification handler for Egyptian Tourism App",
+    "main": "index.js",
+    "dependencies": {
+        "firebase-admin": "^12.0.0"
+    },
+    "engines": {
+        "node": ">=18.0.0"
+    }
+}
