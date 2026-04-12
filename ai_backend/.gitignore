@@ -1,0 +1,9 @@
+.env
+service_account.json
+__pycache__/
+*.pyc
+.venv/
+chroma_db/
+*.egg-info/
+dist/
+build/
