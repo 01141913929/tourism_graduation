@@ -117,7 +117,7 @@ class MessagesListScreen extends StatelessWidget {
   Widget _buildConversationCard(
       BuildContext context, ConversationMessage conversation) {
     final dateFormat = intl.DateFormat('dd/MM HH:mm');
-    final isUnread = conversation.status == 'replied';
+    final isUnread = conversation.status == MessageStatus.replied;
 
     return InkWell(
       onTap: () {
@@ -163,7 +163,7 @@ class MessagesListScreen extends StatelessWidget {
             Expanded(
               flex: 5,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     mainAxisAlignment: MainAxisAlignment.end,

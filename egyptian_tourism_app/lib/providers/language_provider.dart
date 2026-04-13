@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../core/localization/app_strings.dart';
 
 /// Supported languages enum
 enum AppLanguage {
@@ -41,6 +42,7 @@ class LanguageProvider extends ChangeNotifier {
       );
     }
 
+    AppStrings.setLanguage(_currentLanguage == AppLanguage.arabic);
     _isInitialized = true;
     notifyListeners();
   }
@@ -54,6 +56,7 @@ class LanguageProvider extends ChangeNotifier {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_languageKey, language.code);
 
+    AppStrings.setLanguage(_currentLanguage == AppLanguage.arabic);
     notifyListeners();
   }
 

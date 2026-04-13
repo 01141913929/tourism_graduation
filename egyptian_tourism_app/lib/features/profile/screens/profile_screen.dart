@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../models/models.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../repositories/artifact_repository.dart';
 import '../../../repositories/order_repository.dart';
+import '../../../providers/language_provider.dart';
 import 'favorites_screen.dart';
 import 'my_orders_screen.dart';
 import 'personal_info_screen.dart';
@@ -14,6 +17,10 @@ import 'addresses_screen.dart';
 import 'payment_methods_screen.dart';
 import 'messages_list_screen.dart';
 import 'help_center_screen.dart';
+import 'settings_screen.dart';
+import 'notifications_screen.dart';
+import 'my_reviews_screen.dart';
+import '../../artifacts/screens/artifacts_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   const ProfileScreen({super.key});
@@ -36,852 +43,818 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadData() async {
-    await Future.wait([
-      _loadRecentArtifacts(),
-      _loadOrdersCount(),
-    ]);
+    await Future.wait([_loadRecentArtifacts(), _loadOrdersCount()]);
   }
 
   Future<void> _loadRecentArtifacts() async {
     try {
       final artifacts = await _artifactRepository.getArtifacts();
-      if (mounted) {
-        setState(() {
-          _recentArtifacts = artifacts.take(4).toList();
-        });
-      }
+      if (mounted)
+        setState(() => _recentArtifacts = artifacts.take(4).toList());
     } catch (e) {
-      debugPrint('Error loading artifacts: $e');
+      debugPrint('Error: $e');
     }
   }
 
   Future<void> _loadOrdersCount() async {
     try {
-      final authProvider = context.read<AuthProvider>();
-      if (authProvider.userId != null) {
-        final orders =
-            await _orderRepository.getUserOrders(authProvider.userId!);
+      final auth = context.read<AuthProvider>();
+      if (auth.userId != null) {
+        final orders = await _orderRepository.getUserOrders(auth.userId!);
         if (mounted) {
           setState(() {
             _ordersCount = orders.length;
-            _favoritesCount = authProvider.user?.favoriteProductIds.length ?? 0;
+            _favoritesCount = auth.user?.favoriteProductIds.length ?? 0;
           });
         }
       }
     } catch (e) {
-      debugPrint('Error loading orders count: $e');
+      debugPrint('Error: $e');
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: CustomScrollView(
-        slivers: [
-          // Profile Header
-          SliverToBoxAdapter(
-            child: _buildProfileHeader(context),
-          ),
+    context.watch<LanguageProvider>();
 
-          // Stats Cards
-          SliverToBoxAdapter(
-            child: _buildStatsCards(),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: SystemUiOverlayStyle.dark,
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        body: SafeArea(
+          child: SingleChildScrollView(
+            physics: const BouncingScrollPhysics(),
+            child: Column(
+              children: [
+                _buildTopBar(),
+                _buildProfileCard(),
+                const SizedBox(height: 24),
+                _buildQuickStats(),
+                const SizedBox(height: 24),
+                _buildRecentActivity(),
+                const SizedBox(height: 24),
+                _buildMenuSections(),
+                const SizedBox(height: 100),
+              ],
+            ),
           ),
+        ),
+      ),
+    );
+  }
 
-          // Recent Visits
-          SliverToBoxAdapter(
-            child: _buildRecentVisits(context),
+  Widget _buildTopBar() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 0),
+      child: Row(
+        children: [
+          _iconButton(
+              Iconsax.setting_2,
+              () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const SettingsScreen()))),
+          const Spacer(),
+          Text(
+            AppStrings.profile,
+            style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textPrimary),
           ),
-
-          // Menu Items
-          SliverToBoxAdapter(
-            child: _buildMenuSection(context),
-          ),
-
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 32),
-          ),
+          const Spacer(),
+          _iconButton(
+              Iconsax.notification,
+              () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const NotificationsScreen())),
+              showBadge: true),
         ],
       ),
     );
   }
 
-  Widget _buildProfileHeader(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          colors: [AppColors.primaryOrange, Color(0xFFD4651F)],
-          begin: Alignment.topRight,
-          end: Alignment.bottomLeft,
+  Widget _iconButton(IconData icon, VoidCallback onTap,
+      {bool showBadge = false}) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: 44,
+        height: 44,
+        decoration: BoxDecoration(
+          color: const Color(0xFFF8F8F8),
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            Icon(icon, size: 22, color: AppColors.textPrimary),
+            if (showBadge)
+              Positioned(
+                top: 10,
+                right: 10,
+                child: Container(
+                  width: 8,
+                  height: 8,
+                  decoration: const BoxDecoration(
+                      color: AppColors.error, shape: BoxShape.circle),
+                ),
+              ),
+          ],
         ),
       ),
-      child: SafeArea(
-        bottom: false,
-        child: Stack(
-          children: [
-            // Decorative elements
-            Positioned(
-              right: -50,
-              top: -50,
-              child: Container(
-                width: 180,
-                height: 180,
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.1),
-                  shape: BoxShape.circle,
-                ),
-              ),
+    );
+  }
+
+  Widget _buildProfileCard() {
+    return Consumer<AuthProvider>(
+      builder: (context, auth, _) {
+        final name =
+            auth.user?.name ?? (AppStrings.isArabic ? 'المستخدم' : 'User');
+        final email = auth.user?.email ?? '';
+        final initials = name.isNotEmpty
+            ? name[0].toUpperCase()
+            : (AppStrings.isArabic ? 'م' : 'U');
+
+        return Container(
+          margin: const EdgeInsets.fromLTRB(20, 24, 20, 0),
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [AppColors.pharaohBlue, Color(0xFF2C5282)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
             ),
-            Positioned(
-              left: -30,
-              bottom: 0,
-              child: Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: AppColors.gold.withValues(alpha: 0.15),
-                  shape: BoxShape.circle,
-                ),
+            borderRadius: BorderRadius.circular(28),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.pharaohBlue.withOpacity(0.4),
+                blurRadius: 30,
+                offset: const Offset(0, 15),
               ),
-            ),
-            // Content
-            Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
+            ],
+          ),
+          child: Column(
+            children: [
+              Row(
                 children: [
-                  // Top bar
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      IconButton(
-                        onPressed: () {},
-                        icon: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Iconsax.setting_2,
-                            color: AppColors.white,
-                            size: 20,
-                          ),
-                        ),
+                  // Edit Button
+                  GestureDetector(
+                    onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => const PersonalInfoScreen())),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
                       ),
-                      const Text(
-                        'الحساب الشخصي',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.w700,
-                          color: AppColors.white,
-                        ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Iconsax.edit_2,
+                              size: 14, color: Colors.white),
+                          const SizedBox(width: 6),
+                          Text(AppStrings.edit,
+                              style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: Colors.white)),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: () {},
-                        icon: Container(
-                          padding: const EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: AppColors.white.withValues(alpha: 0.2),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: const Icon(
-                            Iconsax.notification,
-                            color: AppColors.white,
-                            size: 20,
-                          ),
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                  const SizedBox(height: 24),
-                  // Avatar and info
-                  Row(
-                    children: [
-                      // Edit button
-                      TextButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => const PersonalInfoScreen(),
-                            ),
-                          );
-                        },
-                        child: Row(
-                          children: [
-                            Icon(
-                              Icons.arrow_back_ios,
-                              size: 14,
-                              color: AppColors.white.withValues(alpha: 0.8),
-                            ),
-                            Text(
-                              'تعديل',
-                              style: TextStyle(
+                  const Spacer(),
+                  // Info
+                  Flexible(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          name,
+                          style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white),
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (email.isNotEmpty)
+                          Text(
+                            email,
+                            style: TextStyle(
                                 fontSize: 13,
-                                color: AppColors.white.withValues(alpha: 0.8),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(),
-                      // Info
-                      Consumer<AuthProvider>(
-                        builder: (context, authProvider, _) {
-                          final userName =
-                              authProvider.user?.name ?? 'المستخدم';
-                          final initials = userName.isNotEmpty
-                              ? userName.substring(0, 1)
-                              : 'م';
-                          return Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Column(
-                                crossAxisAlignment: CrossAxisAlignment.end,
-                                children: [
-                                  ConstrainedBox(
-                                    constraints:
-                                        const BoxConstraints(maxWidth: 120),
-                                    child: Text(
-                                      userName,
-                                      style: const TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.w700,
-                                        color: AppColors.white,
-                                      ),
-                                      overflow: TextOverflow.ellipsis,
-                                      maxLines: 1,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 4,
-                                    ),
-                                    decoration: BoxDecoration(
-                                      color:
-                                          AppColors.gold.withValues(alpha: 0.2),
-                                      borderRadius: BorderRadius.circular(20),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          'عضو ذهبي',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.w600,
-                                            color: AppColors.gold,
-                                          ),
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Icon(
-                                          Iconsax.crown5,
-                                          size: 14,
-                                          color: AppColors.gold,
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              const SizedBox(width: 12),
-                              // Avatar
-                              Container(
-                                width: 70,
-                                height: 70,
-                                decoration: BoxDecoration(
-                                  color: AppColors.white,
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: AppColors.white,
-                                    width: 3,
-                                  ),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: AppColors.black
-                                          .withValues(alpha: 0.2),
-                                      blurRadius: 16,
-                                      offset: const Offset(0, 4),
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    initials,
-                                    style: const TextStyle(
-                                      fontSize: 24,
-                                      fontWeight: FontWeight.w700,
-                                      color: AppColors.primaryOrange,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            ],
-                          );
-                        },
-                      ),
-                    ],
+                                color: Colors.white.withOpacity(0.7)),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
                   ),
-                  const SizedBox(height: 16),
+                  const SizedBox(width: 16),
+                  // Avatar
+                  Container(
+                    width: 64,
+                    height: 64,
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                            color: Colors.black.withOpacity(0.2),
+                            blurRadius: 15,
+                            offset: const Offset(0, 5)),
+                      ],
+                    ),
+                    child: Center(
+                      child: Text(
+                        initials,
+                        style: const TextStyle(
+                            fontSize: 26,
+                            fontWeight: FontWeight.w800,
+                            color: AppColors.pharaohBlue),
+                      ),
+                    ),
+                  ),
                 ],
               ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatsCards() {
-    return Transform.translate(
-      offset: const Offset(0, -20),
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 16),
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(20),
-          boxShadow: [
-            BoxShadow(
-              color: AppColors.black.withValues(alpha: 0.08),
-              blurRadius: 20,
-              offset: const Offset(0, 8),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            _buildStatItem(
-              icon: Iconsax.heart5,
-              value: '$_favoritesCount',
-              label: 'المفضلة',
-              color: AppColors.error,
-            ),
-            _buildStatDivider(),
-            _buildStatItem(
-              icon: Iconsax.box,
-              value: '$_ordersCount',
-              label: 'الطلبات',
-              color: AppColors.primaryOrange,
-            ),
-            _buildStatDivider(),
-            _buildStatItem(
-              icon: Iconsax.location,
-              value: '${_recentArtifacts.length}',
-              label: 'الزيارات',
-              color: AppColors.secondaryTeal,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildStatItem({
-    required IconData icon,
-    required String value,
-    required String label,
-    required Color color,
-  }) {
-    return Expanded(
-      child: Column(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(10),
-            decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
-              shape: BoxShape.circle,
-            ),
-            child: Icon(
-              icon,
-              color: color,
-              size: 22,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: const TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildStatDivider() {
-    return Container(
-      width: 1,
-      height: 50,
-      color: AppColors.divider,
-    );
-  }
-
-  Widget _buildRecentVisits(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      padding: const EdgeInsets.all(16),
-      color: AppColors.white,
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton(
-                onPressed: () {},
-                child: const Row(
+              const SizedBox(height: 20),
+              // Membership
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Icon(
-                      Icons.arrow_back_ios,
-                      size: 14,
-                      color: AppColors.primaryOrange,
-                    ),
                     Text(
-                      'عرض الكل',
+                      AppStrings.isArabic
+                          ? 'عضوية ذهبية نشطة'
+                          : 'Active Gold Membership',
                       style: TextStyle(
-                        fontSize: 13,
-                        color: AppColors.primaryOrange,
-                      ),
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.white.withOpacity(0.9)),
                     ),
+                    const SizedBox(width: 8),
+                    const Icon(Iconsax.crown5, size: 18, color: Colors.amber),
                   ],
                 ),
               ),
-              Row(
-                children: [
-                  const Text(
-                    'آخر الزيارات',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Icon(
-                    Iconsax.clock,
-                    color: AppColors.primaryOrange,
-                    size: 20,
-                  ),
-                ],
-              ),
             ],
           ),
-          const SizedBox(height: 16),
-          SizedBox(
-            height: 130,
-            child: ListView.builder(
-              scrollDirection: Axis.horizontal,
-              reverse: true,
-              itemCount: 4,
-              itemBuilder: (context, index) {
-                final artifact = _recentArtifacts.isNotEmpty
-                    ? _recentArtifacts[index % _recentArtifacts.length]
-                    : null;
-                if (artifact == null) {
-                  return const SizedBox();
-                }
-                return Container(
-                  width: 110,
-                  margin: const EdgeInsets.only(left: 12),
-                  child: Column(
-                    children: [
-                      Expanded(
-                        child: Stack(
-                          children: [
-                            Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(16),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color:
-                                        AppColors.black.withValues(alpha: 0.1),
-                                    blurRadius: 8,
-                                    offset: const Offset(0, 4),
-                                  ),
-                                ],
-                              ),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(16),
-                                child: CachedNetworkImage(
-                                  imageUrl: artifact.imageUrl,
-                                  width: 110,
-                                  height: 100,
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                            ),
-                            Positioned(
-                              bottom: 8,
-                              right: 8,
-                              child: Container(
-                                padding: const EdgeInsets.all(4),
-                                decoration: const BoxDecoration(
-                                  color: AppColors.primaryOrange,
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.check,
-                                  size: 10,
-                                  color: AppColors.white,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        artifact.nameAr,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                          color: AppColors.textPrimary,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ],
-                  ),
-                );
-              },
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildMenuSection(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.only(top: 8),
-      color: AppColors.white,
-      child: Column(
+  Widget _buildQuickStats() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Row(
         children: [
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.heart,
-            title: 'المفضلة',
-            subtitle: 'التحف والمنتجات المحفوظة',
-            badgeCount: 12,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const FavoritesScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.box,
-            title: 'طلباتي',
-            subtitle: '2 طلب قيد التنفيذ',
-            badgeCount: 2,
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MyOrdersScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.user,
-            title: 'معلوماتي الشخصية',
-            subtitle: 'تعديل البيانات الشخصية',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PersonalInfoScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.location,
-            title: 'العناوين',
-            subtitle: '2 عنوان محفوظ',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const AddressesScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.card,
-            title: 'وسائل الدفع',
-            subtitle: 'بطاقات الائتمان والمحافظ',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const PaymentMethodsScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.messages,
-            title: 'رسائلي',
-            subtitle: 'محادثات مع البازارات',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const MessagesListScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.message_question,
-            title: 'مركز المساعدة',
-            subtitle: 'الأسئلة الشائعة والدعم',
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const HelpCenterScreen(),
-                ),
-              );
-            },
-          ),
-          _buildDivider(),
-          _buildMenuItem(
-            context: context,
-            icon: Iconsax.logout,
-            title: 'تسجيل الخروج',
-            subtitle: '',
-            isLogout: true,
-            onTap: () {
-              _showLogoutDialog(context);
-            },
-          ),
+          _statCard(Iconsax.heart5, '$_favoritesCount', AppStrings.favorites,
+              AppColors.primaryOrange, () {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const FavoritesScreen()));
+          }),
+          const SizedBox(width: 12),
+          _statCard(
+              Iconsax.box, '$_ordersCount', AppStrings.orders, AppColors.gold,
+              () {
+            Navigator.push(context,
+                MaterialPageRoute(builder: (_) => const MyOrdersScreen()));
+          }),
+          const SizedBox(width: 12),
+          _statCard(
+              Iconsax.location,
+              '${_recentArtifacts.length}',
+              AppStrings.isArabic ? 'الزيارات' : 'Visits',
+              AppColors.secondaryTeal,
+              () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const ArtifactsScreen()))),
         ],
       ),
     );
   }
 
-  Widget _buildMenuItem({
-    required BuildContext context,
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required VoidCallback onTap,
-    int? badgeCount,
-    bool isLogout = false,
-  }) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-        child: Row(
-          children: [
-            const Icon(
-              Icons.arrow_back_ios,
-              color: AppColors.textHint,
-              size: 16,
-            ),
-            if (badgeCount != null) ...[
-              const SizedBox(width: 8),
+  Widget _statCard(IconData icon, String value, String label, Color color,
+      VoidCallback onTap) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: onTap,
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.08),
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: color.withOpacity(0.15)),
+          ),
+          child: Column(
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                width: 48,
+                height: 48,
                 decoration: BoxDecoration(
-                  color: AppColors.primaryOrange,
-                  borderRadius: BorderRadius.circular(10),
+                  color: color.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(14),
                 ),
-                child: Text(
-                  '$badgeCount',
-                  style: const TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.white,
-                  ),
-                ),
+                child: Icon(icon, color: color, size: 24),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                value,
+                style: TextStyle(
+                    fontSize: 24, fontWeight: FontWeight.w900, color: color),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                    color: Color(0xFF888888)),
               ),
             ],
-            const Spacer(),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  title,
-                  style: TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: isLogout ? AppColors.error : AppColors.textPrimary,
-                  ),
-                ),
-                if (subtitle.isNotEmpty) ...[
-                  const SizedBox(height: 2),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-            const SizedBox(width: 12),
-            Container(
-              padding: const EdgeInsets.all(10),
-              decoration: BoxDecoration(
-                color: isLogout
-                    ? AppColors.error.withValues(alpha: 0.1)
-                    : AppColors.background,
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Icon(
-                icon,
-                color: isLogout ? AppColors.error : AppColors.textSecondary,
-                size: 22,
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildDivider() {
-    return const Divider(
-      height: 1,
-      indent: 16,
-      endIndent: 16,
-      color: AppColors.divider,
+  Widget _buildRecentActivity() {
+    if (_recentArtifacts.isEmpty) return const SizedBox();
+
+    return Column(
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            children: [
+              GestureDetector(
+                onTap: () => Navigator.push(context,
+                    MaterialPageRoute(builder: (_) => const ArtifactsScreen())),
+                child: Row(
+                  children: [
+                    const Icon(Icons.arrow_back_ios,
+                        size: 12, color: AppColors.primaryOrange),
+                    const SizedBox(width: 4),
+                    Text(AppStrings.seeAll,
+                        style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.primaryOrange)),
+                  ],
+                ),
+              ),
+              const Spacer(),
+              Text(AppStrings.isArabic ? 'النشاط الأخير' : 'Recent Activity',
+                  style: const TextStyle(
+                      fontSize: 17,
+                      fontWeight: FontWeight.w700,
+                      color: AppColors.textPrimary)),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SizedBox(
+          height: 120,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal,
+            reverse: true,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            physics: const BouncingScrollPhysics(),
+            itemCount: _recentArtifacts.length,
+            itemBuilder: (context, index) {
+              final artifact = _recentArtifacts[index];
+              return Container(
+                width: 100,
+                margin: const EdgeInsets.symmetric(horizontal: 6),
+                child: Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                              color: Colors.black.withOpacity(0.1),
+                              blurRadius: 15,
+                              offset: const Offset(0, 5)),
+                        ],
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: CachedNetworkImage(
+                            imageUrl: artifact.imageUrl, fit: BoxFit.cover),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      artifact.nameAr,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 12, fontWeight: FontWeight.w500),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(20),
+  Widget _buildMenuSections() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(AppStrings.isArabic ? 'الحساب' : 'Account',
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 12),
+          _menuCard([
+            _menuItem(
+                Iconsax.user,
+                AppStrings.personalInfo,
+                const Color(0xFF667eea),
+                () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PersonalInfoScreen()))),
+            _menuItem(
+                Iconsax.location,
+                AppStrings.addresses,
+                const Color(0xFF4ecdc4),
+                () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const AddressesScreen()))),
+            _menuItem(
+                Iconsax.card,
+                AppStrings.paymentMethods,
+                const Color(0xFFf093fb),
+                () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const PaymentMethodsScreen()))),
+          ]),
+          const SizedBox(height: 20),
+          Text(AppStrings.isArabic ? 'التواصل' : 'Communication',
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 12),
+          _menuCard([
+            _menuItem(
+                Iconsax.messages_3,
+                AppStrings.isArabic ? 'رسائلي' : 'Messages',
+                AppColors.pharaohBlue,
+                () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const MessagesListScreen())),
+                badge: 3),
+            _menuItem(
+                Iconsax.message_question,
+                AppStrings.helpCenter,
+                AppColors.gold,
+                () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const HelpCenterScreen()))),
+          ]),
+          const SizedBox(height: 20),
+          Text(AppStrings.isArabic ? 'المزيد' : 'More',
+              style: const TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary)),
+          const SizedBox(height: 12),
+          _menuCard([
+            _menuItem(
+                Iconsax.star,
+                AppStrings.isArabic ? 'تقييماتي' : 'My Reviews',
+                const Color(0xFFf8b500),
+                () => Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                        builder: (_) => const MyReviewsScreen()))),
+            _menuItem(
+                Iconsax.heart_edit,
+                AppStrings.isArabic ? 'قيّم التطبيق' : 'Rate App',
+                const Color(0xFFe17055),
+                () => _showRateAppDialog()),
+            _menuItem(Iconsax.info_circle, AppStrings.aboutUs,
+                const Color(0xFF00cec9), () => _showAboutDialog()),
+            _menuItem(Iconsax.logout, AppStrings.logout,
+                const Color(0xFFff7675), () => _showLogoutDialog(),
+                isDestructive: true),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _menuCard(List<Widget> items) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFFAFAFA),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        children: List.generate(items.length, (index) {
+          return Column(
+            children: [
+              items[index],
+              if (index < items.length - 1)
+                Divider(
+                    height: 1,
+                    indent: 64,
+                    endIndent: 16,
+                    color: Colors.grey.shade200),
+            ],
+          );
+        }),
+      ),
+    );
+  }
+
+  Widget _menuItem(IconData icon, String title, Color color, VoidCallback onTap,
+      {int? badge, bool isDestructive = false}) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+          child: Row(
+            children: [
+              Icon(Icons.arrow_back_ios, size: 14, color: Colors.grey.shade400),
+              if (badge != null) ...[
+                const SizedBox(width: 8),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                      color: color, borderRadius: BorderRadius.circular(10)),
+                  child: Text('$badge',
+                      style: const TextStyle(
+                          fontSize: 11,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white)),
+                ),
+              ],
+              const Spacer(),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: isDestructive ? color : AppColors.textPrimary,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, size: 22, color: color),
+              ),
+            ],
+          ),
         ),
-        contentPadding: const EdgeInsets.all(24),
-        content: Column(
+      ),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              padding: const EdgeInsets.all(16),
+              width: 64,
+              height: 64,
               decoration: BoxDecoration(
-                color: AppColors.error.withValues(alpha: 0.1),
-                shape: BoxShape.circle,
+                color: const Color(0xFFff7675).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(18),
               ),
-              child: const Icon(
-                Iconsax.logout,
-                color: AppColors.error,
-                size: 32,
-              ),
+              child: const Icon(Iconsax.logout,
+                  size: 28, color: Color(0xFFff7675)),
             ),
-            const SizedBox(height: 16),
-            const Text(
-              'تسجيل الخروج',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                color: AppColors.textPrimary,
-              ),
-            ),
+            const SizedBox(height: 20),
+            Text(AppStrings.logout,
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
             const SizedBox(height: 8),
-            Text(
-              'هل أنت متأكد من تسجيل الخروج؟',
-              style: TextStyle(
-                fontSize: 14,
-                color: AppColors.textSecondary,
-              ),
-              textAlign: TextAlign.center,
-            ),
+            Text(AppStrings.logoutConfirm,
+                style: const TextStyle(fontSize: 14, color: Color(0xFF888888))),
             const SizedBox(height: 24),
             Row(
               children: [
                 Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.pop(context),
-                    style: OutlinedButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                  child: GestureDetector(
+                    onTap: () => Navigator.pop(ctx),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                      side: BorderSide(color: AppColors.divider),
-                    ),
-                    child: const Text(
-                      'إلغاء',
-                      style: TextStyle(
-                        color: AppColors.textPrimary,
-                        fontWeight: FontWeight.w600,
+                      child: Center(
+                        child: Text(AppStrings.cancel,
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textPrimary)),
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      Navigator.pop(context); // Close the dialog
-                      final authProvider = context.read<AuthProvider>();
-                      await authProvider.signOut();
-                      if (context.mounted) {
-                        // Navigate to login screen and clear the navigation stack
-                        Navigator.of(context).pushNamedAndRemoveUntil(
-                          '/login',
-                          (route) => false,
-                        );
-                      }
+                  child: GestureDetector(
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      context.read<AuthProvider>().signOut();
                     },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      decoration: BoxDecoration(
+                        color: AppColors.error,
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    ),
-                    child: const Text(
-                      'خروج',
-                      style: TextStyle(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w600,
+                      child: Center(
+                        child: Text(AppStrings.logout,
+                            style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white)),
                       ),
                     ),
                   ),
                 ),
               ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showRateAppDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                color: const Color(0xFFf8b500).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(18),
+              ),
+              child:
+                  const Icon(Iconsax.star1, size: 32, color: Color(0xFFf8b500)),
+            ),
+            const SizedBox(height: 20),
+            Text(AppStrings.isArabic ? 'قيّم التطبيق' : 'Rate App',
+                style:
+                    const TextStyle(fontSize: 20, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            Text(
+                AppStrings.isArabic
+                    ? 'رأيك يهمنا! ساعدنا في تحسين التطبيق'
+                    : 'Your opinion matters! Help us improve',
+                style: const TextStyle(fontSize: 14, color: Color(0xFF888888))),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                  5,
+                  (i) => Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Icon(Iconsax.star1,
+                            size: 36,
+                            color: i < 4
+                                ? const Color(0xFFf8b500)
+                                : Colors.grey.shade300),
+                      )),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFFf8b500),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+                child: Text(
+                    AppStrings.isArabic ? 'إرسال التقييم' : 'Submit Rating',
+                    style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showAboutDialog() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        margin: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(28),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF00cec9), Color(0xFF0984e3)],
+                ),
+                borderRadius: BorderRadius.circular(22),
+              ),
+              child: const Icon(Iconsax.shop, size: 40, color: Colors.white),
+            ),
+            const SizedBox(height: 20),
+            const Text('سوق مصر',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800)),
+            const SizedBox(height: 8),
+            const Text('الإصدار 1.0.0',
+                style: TextStyle(fontSize: 14, color: Color(0xFF888888))),
+            const SizedBox(height: 16),
+            const Text(
+              'تطبيق متخصص في عرض وبيع التحف والهدايا المصرية الأصيلة. اكتشف روائع الحضارة الفرعونية واقتني قطعاً فريدة من تاريخ مصر العريق.',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                  fontSize: 14, color: Color(0xFF666666), height: 1.6),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: () => Navigator.pop(ctx),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF00cec9),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                ),
+                child: const Text('حسناً',
+                    style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: Colors.white)),
+              ),
             ),
           ],
         ),

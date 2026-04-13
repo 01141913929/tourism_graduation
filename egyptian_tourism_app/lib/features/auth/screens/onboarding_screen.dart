@@ -195,7 +195,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.end,
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Icon Badge
                 Container(
@@ -218,7 +218,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // Title
                 Text(
                   data.title,
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.start,
                   style: const TextStyle(
                     fontSize: 32,
                     fontWeight: FontWeight.w800,
@@ -231,7 +231,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
                 // Description
                 Text(
                   data.description,
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.start,
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w400,

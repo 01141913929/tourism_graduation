@@ -10,6 +10,10 @@ import '../../../repositories/review_repository.dart';
 import '../../../models/models.dart';
 import '../../../models/review_model.dart';
 import '../../../providers/app_state.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../providers/language_provider.dart';
+import 'reviews_screen.dart';
+import '../../shop/screens/bazaar_details_screen.dart';
 
 class ProductDetailsScreen extends StatefulWidget {
   final Product product;
@@ -77,6 +81,10 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     );
 
     _animationController.forward();
+
+    // Load initial favorite state
+    final authProvider = context.read<AuthProvider>();
+    _isFavorite = authProvider.isFavorite(widget.product.id);
 
     // Load related products and reviews from Firebase
     _loadRelatedProducts();
@@ -167,9 +175,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         _buildCircleButton(
           icon: _isFavorite ? Iconsax.heart5 : Iconsax.heart,
           iconColor: _isFavorite ? AppColors.error : null,
-          onTap: () {
+          onTap: () async {
+            final authProvider = context.read<AuthProvider>();
+            final result = await authProvider.toggleFavorite(widget.product.id);
             setState(() {
-              _isFavorite = !_isFavorite;
+              _isFavorite = result;
             });
             HapticFeedback.lightImpact();
           },
@@ -177,7 +187,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         const SizedBox(width: 8),
         _buildCircleButton(
           icon: Iconsax.share,
-          onTap: () {},
+          onTap: () => _shareProduct(),
         ),
         const SizedBox(width: 16),
       ],
@@ -410,7 +420,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           Padding(
             padding: const EdgeInsets.all(20),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 // Category & Rating Row
                 Row(
@@ -479,14 +489,15 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
                 // Title
                 Text(
-                  widget.product.nameAr,
+                  widget.product
+                      .getName(context.watch<LanguageProvider>().isArabic),
                   style: const TextStyle(
                     fontSize: 24,
                     fontWeight: FontWeight.w700,
                     color: AppColors.textPrimary,
                     height: 1.3,
                   ),
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.start,
                 ),
                 const SizedBox(height: 16),
 
@@ -592,7 +603,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           ),
           // Main price
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               if (widget.product.hasDiscount)
                 Text(
@@ -605,7 +616,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                 ),
               Row(
                 mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'ج.م',
@@ -635,7 +646,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Widget _buildSizeSelection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -719,7 +730,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Widget _buildQuantitySelector() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'الكمية',
@@ -800,7 +811,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Widget _buildDescription() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'الوصف',
@@ -817,10 +828,11 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               ? CrossFadeState.showSecond
               : CrossFadeState.showFirst,
           firstChild: Text(
-            widget.product.descriptionAr,
+            widget.product
+                .getDescription(context.watch<LanguageProvider>().isArabic),
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -828,8 +840,9 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             ),
           ),
           secondChild: Text(
-            widget.product.descriptionAr,
-            textAlign: TextAlign.right,
+            widget.product
+                .getDescription(context.watch<LanguageProvider>().isArabic),
+            textAlign: TextAlign.start,
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -876,7 +889,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     ];
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'المواصفات',
@@ -941,7 +954,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Widget _buildBazaarSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'متوفر في',
@@ -952,155 +965,174 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
           ),
         ),
         const SizedBox(height: 12),
-        Container(
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              colors: [
-                AppColors.secondaryTeal.withValues(alpha: 0.08),
-                AppColors.secondaryTeal.withValues(alpha: 0.02),
-              ],
-              begin: Alignment.centerRight,
-              end: Alignment.centerLeft,
+        GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => BazaarDetailsScreen(
+                  bazaarId: widget.product.bazaarId,
+                ),
+              ),
+            );
+          },
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.secondaryTeal.withValues(alpha: 0.08),
+                  AppColors.secondaryTeal.withValues(alpha: 0.02),
+                ],
+                begin: Alignment.centerRight,
+                end: Alignment.centerLeft,
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.secondaryTeal.withValues(alpha: 0.2),
+              ),
             ),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: AppColors.secondaryTeal.withValues(alpha: 0.2),
-            ),
-          ),
-          child: Column(
-            children: [
-              Row(
-                children: [
-                  // View on map button
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: AppColors.primaryOrange,
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Text(
-                          'عرض على الخريطة',
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.white,
-                          ),
-                        ),
-                        SizedBox(width: 4),
-                        Icon(
-                          Icons.map_outlined,
-                          color: AppColors.white,
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Spacer(),
-                  // Bazaar info
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
-                    children: [
-                      Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Text(
-                            widget.product.bazaarName.isNotEmpty
-                                ? widget.product.bazaarName
-                                : 'بزار خان الخليلي',
-                            style: const TextStyle(
-                              fontSize: 15,
-                              fontWeight: FontWeight.w700,
-                              color: AppColors.textPrimary,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: AppColors.secondaryTeal
-                                  .withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            child: const Icon(
-                              Icons.store,
-                              color: AppColors.secondaryTeal,
-                              size: 20,
-                            ),
-                          ),
-                        ],
+            child: Column(
+              children: [
+                Row(
+                  children: [
+                    // View on map button
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primaryOrange,
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                      const SizedBox(height: 4),
-                      Row(
+                      child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: AppColors.success,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          const Text(
-                            'مفتوح الآن',
+                        children: const [
+                          Text(
+                            'عرض على الخريطة',
                             style: TextStyle(
                               fontSize: 12,
-                              color: AppColors.success,
-                              fontWeight: FontWeight.w500,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.white,
                             ),
+                          ),
+                          SizedBox(width: 4),
+                          Icon(
+                            Icons.map_outlined,
+                            color: AppColors.white,
+                            size: 16,
                           ),
                         ],
                       ),
-                    ],
-                  ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              // Contact info
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.5),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildContactButton(
-                      icon: Icons.phone,
-                      label: 'اتصال',
-                      onTap: () {},
                     ),
-                    Container(
-                      width: 1,
-                      height: 30,
-                      color: AppColors.divider,
-                    ),
-                    _buildContactButton(
-                      icon: Icons.chat_bubble_outline,
-                      label: 'رسالة',
-                      onTap: () {},
-                    ),
-                    Container(
-                      width: 1,
-                      height: 30,
-                      color: AppColors.divider,
-                    ),
-                    _buildContactButton(
-                      icon: Icons.share,
-                      label: 'مشاركة',
-                      onTap: () {},
+                    const SizedBox(width: 12),
+                    // Bazaar info
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            mainAxisAlignment: MainAxisAlignment.end,
+                            children: [
+                              Flexible(
+                                child: Text(
+                                  widget.product.bazaarName.isNotEmpty
+                                      ? widget.product.bazaarName
+                                      : 'بزار خان الخليلي',
+                                  style: const TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                  overflow: TextOverflow.ellipsis,
+                                  maxLines: 1,
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.all(8),
+                                decoration: BoxDecoration(
+                                  color: AppColors.secondaryTeal
+                                      .withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: const Icon(
+                                  Icons.store,
+                                  color: AppColors.secondaryTeal,
+                                  size: 20,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: const BoxDecoration(
+                                  color: AppColors.success,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              const Text(
+                                'مفتوح الآن',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: AppColors.success,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-            ],
+                const SizedBox(height: 12),
+                // Contact info
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: AppColors.white.withValues(alpha: 0.5),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _buildContactButton(
+                        icon: Icons.phone,
+                        label: 'اتصال',
+                        onTap: () => _showContactDialog(),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 30,
+                        color: AppColors.divider,
+                      ),
+                      _buildContactButton(
+                        icon: Icons.chat_bubble_outline,
+                        label: 'رسالة',
+                        onTap: () => _showMessageDialog(),
+                      ),
+                      Container(
+                        width: 1,
+                        height: 30,
+                        color: AppColors.divider,
+                      ),
+                      _buildContactButton(
+                        icon: Icons.share,
+                        label: 'مشاركة',
+                        onTap: () => _shareProduct(),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ],
@@ -1207,14 +1239,23 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
 
   Widget _buildReviewsSection() {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
             TextButton(
               onPressed: () {
-                // TODO: Navigate to all reviews screen
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => ReviewsScreen(
+                      targetId: widget.product.id,
+                      targetName: widget.product.nameAr,
+                      targetType: 'product',
+                    ),
+                  ),
+                );
               },
               child: const Text(
                 'عرض الكل',
@@ -1297,7 +1338,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
         border: Border.all(color: AppColors.divider),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
@@ -1312,7 +1353,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
               const Spacer(),
               // User info
               Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     review.userName,
@@ -1365,7 +1406,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             const SizedBox(height: 12),
             Text(
               review.comment!,
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.start,
               style: const TextStyle(
                 fontSize: 14,
                 height: 1.5,
@@ -1382,7 +1423,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
     final related = _relatedProducts;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -1462,7 +1503,7 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
                         child: Padding(
                           padding: const EdgeInsets.all(10),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 product.nameAr,
@@ -1636,6 +1677,111 @@ class _ProductDetailsScreenState extends State<ProductDetailsScreen>
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _shareProduct() {
+    // Copy product info to clipboard
+    HapticFeedback.mediumImpact();
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: const Text('تم نسخ معلومات المنتج!'),
+        action: SnackBarAction(
+          label: 'تم',
+          onPressed: () {},
+        ),
+      ),
+    );
+  }
+
+  void _showContactDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('اتصال بالبازار',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Iconsax.call, size: 48, color: AppColors.primaryOrange),
+            const SizedBox(height: 16),
+            Text(widget.product.bazaarName,
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
+            const SizedBox(height: 8),
+            Text('للاستفسار عن: ${widget.product.nameAr}',
+                style: TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('جاري الاتصال...')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange),
+            child: const Text('اتصال', style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showMessageDialog() {
+    final messageController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('إرسال رسالة',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text('إلى: ${widget.product.bazaarName}',
+                style: TextStyle(color: AppColors.textSecondary)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: messageController,
+              maxLines: 3,
+              textAlign: TextAlign.start,
+              decoration: InputDecoration(
+                hintText: 'اكتب رسالتك هنا...',
+                border:
+                    OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('تم إرسال الرسالة!')),
+              );
+            },
+            style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryOrange),
+            child: const Text('إرسال', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

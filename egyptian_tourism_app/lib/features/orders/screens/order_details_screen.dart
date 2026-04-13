@@ -7,6 +7,7 @@ import '../../../models/sub_order_model.dart';
 import '../../../repositories/order_repository.dart';
 import '../../../repositories/sub_order_repository.dart';
 import '../../cart/screens/order_tracking_screen.dart';
+import '../../products/screens/reviews_screen.dart';
 
 /// شاشة تفاصيل الطلب للعميل
 class OrderDetailsScreen extends StatefulWidget {
@@ -404,7 +405,7 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
             ),
           ),
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text('${item.price.toStringAsFixed(0)} ج.م',
                   style: const TextStyle(fontWeight: FontWeight.w600)),
@@ -571,7 +572,20 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           Expanded(
             child: ElevatedButton.icon(
               onPressed: () {
-                // TODO: Navigate to reviews
+                // Navigate to review for first sub-order's bazaar
+                if (_subOrders.isNotEmpty) {
+                  final subOrder = _subOrders.first;
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ReviewsScreen(
+                        targetId: subOrder.bazaarId,
+                        targetName: subOrder.bazaarName,
+                        targetType: 'bazaar',
+                      ),
+                    ),
+                  );
+                }
               },
               style: ElevatedButton.styleFrom(
                 backgroundColor: AppColors.gold,
@@ -623,10 +637,35 @@ class _OrderDetailsScreenState extends State<OrderDetailsScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              // TODO: Implement order cancellation
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('تم إرسال طلب الإلغاء')),
-              );
+              // Cancel all pending sub-orders
+              try {
+                for (final subOrder in _subOrders) {
+                  if (subOrder.status == SubOrderStatus.pending) {
+                    await _subOrderRepository.updateSubOrderStatus(
+                      subOrder.id,
+                      SubOrderStatus.cancelled,
+                    );
+                  }
+                }
+                await _loadOrderDetails();
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('تم إلغاء الطلب بنجاح'),
+                      backgroundColor: Colors.green,
+                    ),
+                  );
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('خطأ: $e'),
+                      backgroundColor: Colors.red,
+                    ),
+                  );
+                }
+              }
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child:

@@ -8,6 +8,7 @@ import '../../../models/models.dart';
 import '../../../providers/auth_provider.dart';
 import '../../../repositories/product_repository.dart';
 import '../../../repositories/artifact_repository.dart';
+import '../../../repositories/user_repository.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -21,6 +22,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
   late TabController _tabController;
   final ProductRepository _productRepository = ProductRepository();
   final ArtifactRepository _artifactRepository = ArtifactRepository();
+  final UserRepository _userRepository = UserRepository();
 
   List<Product> _favoriteProducts = [];
   List<Artifact> _favoriteArtifacts = [];
@@ -175,7 +177,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
                         Iconsax.heart5,
@@ -309,6 +311,42 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     return Dismissible(
       key: Key('artifact_${artifact.id}'),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                title:
+                    const Text('إزالة من المفضلة', textAlign: TextAlign.center),
+                content: const Text('هل تريد إزالة هذه التحفة من المفضلة؟',
+                    textAlign: TextAlign.center),
+                actionsAlignment: MainAxisAlignment.center,
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('إلغاء'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error),
+                    child: const Text('إزالة',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      },
+      onDismissed: (direction) async {
+        final authProvider = context.read<AuthProvider>();
+        if (authProvider.userId != null) {
+          await _userRepository.toggleArtifactFavorite(
+              authProvider.userId!, artifact.id);
+        }
+        setState(() => _favoriteArtifacts.removeAt(index));
+      },
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
@@ -382,7 +420,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
                         children: [
@@ -421,7 +459,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                         artifact.descriptionAr,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.right,
+                        textAlign: TextAlign.start,
                         style: TextStyle(
                           fontSize: 13,
                           color: AppColors.textSecondary,
@@ -503,6 +541,42 @@ class _FavoritesScreenState extends State<FavoritesScreen>
     return Dismissible(
       key: Key('product_${product.id}'),
       direction: DismissDirection.endToStart,
+      confirmDismiss: (direction) async {
+        return await showDialog<bool>(
+              context: context,
+              builder: (ctx) => AlertDialog(
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(20)),
+                title:
+                    const Text('إزالة من المفضلة', textAlign: TextAlign.center),
+                content: const Text('هل تريد إزالة هذا المنتج من المفضلة؟',
+                    textAlign: TextAlign.center),
+                actionsAlignment: MainAxisAlignment.center,
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.pop(ctx, false),
+                    child: const Text('إلغاء'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () => Navigator.pop(ctx, true),
+                    style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.error),
+                    child: const Text('إزالة',
+                        style: TextStyle(color: Colors.white)),
+                  ),
+                ],
+              ),
+            ) ??
+            false;
+      },
+      onDismissed: (direction) async {
+        final authProvider = context.read<AuthProvider>();
+        if (authProvider.userId != null) {
+          await _userRepository.toggleFavorite(
+              authProvider.userId!, product.id);
+        }
+        setState(() => _favoriteProducts.removeAt(index));
+      },
       background: Container(
         alignment: Alignment.centerLeft,
         padding: const EdgeInsets.only(left: 20),
@@ -567,7 +641,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Text(
@@ -577,7 +651,7 @@ class _FavoritesScreenState extends State<FavoritesScreen>
                           fontWeight: FontWeight.w700,
                           color: AppColors.textPrimary,
                         ),
-                        textAlign: TextAlign.right,
+                        textAlign: TextAlign.start,
                       ),
                       const SizedBox(height: 8),
                       Row(

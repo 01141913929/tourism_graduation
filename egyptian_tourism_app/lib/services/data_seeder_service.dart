@@ -970,6 +970,72 @@ class DataSeederService {
     await batch.commit();
   }
 
+  /// Seed sample notifications for a specific user
+  Future<void> seedUserNotifications(String userId) async {
+    // Check if notifications already exist for this user
+    final existing = await _firestore
+        .collection('notifications')
+        .where('userId', isEqualTo: userId)
+        .limit(1)
+        .get();
+
+    if (existing.docs.isNotEmpty) return;
+
+    final now = DateTime.now();
+    final notifications = [
+      {
+        'userId': userId,
+        'type': 'system',
+        'title': 'مرحباً بك في تطبيق السياحة المصرية! 🎉',
+        'body': 'اكتشف أروع المنتجات الحرفية والتحف من أشهر البازارات المصرية.',
+        'isRead': false,
+        'createdAt': now.subtract(const Duration(minutes: 5)).toIso8601String(),
+      },
+      {
+        'userId': userId,
+        'type': 'promo',
+        'title': 'عرض خاص: خصم 25% على التحف الفرعونية 🏺',
+        'body':
+            'احصل على خصم 25% على جميع التماثيل والتحف الفرعونية من بازار خان الخليلي. العرض ساري لمدة أسبوع.',
+        'isRead': false,
+        'createdAt': now.subtract(const Duration(hours: 2)).toIso8601String(),
+      },
+      {
+        'userId': userId,
+        'type': 'order_update',
+        'title': 'تم استلام طلبك بنجاح ✅',
+        'body': 'تم تأكيد طلبك رقم #1234. سيتم شحنه خلال 3 أيام عمل.',
+        'isRead': true,
+        'readAt': now.subtract(const Duration(hours: 1)).toIso8601String(),
+        'createdAt': now.subtract(const Duration(days: 1)).toIso8601String(),
+      },
+      {
+        'userId': userId,
+        'type': 'promo',
+        'title': 'منتجات جديدة في سوق أسوان 🌟',
+        'body': 'تم إضافة مجموعة جديدة من المنسوجات النوبية والتوابل الأصلية.',
+        'isRead': true,
+        'readAt': now.subtract(const Duration(days: 1)).toIso8601String(),
+        'createdAt': now.subtract(const Duration(days: 2)).toIso8601String(),
+      },
+      {
+        'userId': userId,
+        'type': 'system',
+        'title': 'نصيحة: أضف منتجاتك المفضلة ❤️',
+        'body': 'اضغط على أيقونة القلب في صفحة أي منتج لإضافته إلى المفضلة.',
+        'isRead': false,
+        'createdAt': now.subtract(const Duration(days: 3)).toIso8601String(),
+      },
+    ];
+
+    final batch = _firestore.batch();
+    for (final notification in notifications) {
+      final docRef = _firestore.collection('notifications').doc();
+      batch.set(docRef, notification);
+    }
+    await batch.commit();
+  }
+
   /// Clear all seeded data (for testing)
   Future<void> clearAllData() async {
     final collections = [

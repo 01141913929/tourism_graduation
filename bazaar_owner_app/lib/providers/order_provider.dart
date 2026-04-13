@@ -142,8 +142,9 @@ class OrderProvider extends ChangeNotifier {
       // Notify Customer
       NotificationService().sendNotification(
         targetUserId: subOrder.customerId,
-        title: 'تم قبول طلبك',
-        body: 'تم قبول طلبك من قبل ${qrData.bazaarId} وجاري التجهيز.',
+        title: '✨ خبر مفرح! تم قبول طلبك ✅',
+        body:
+            'عظيم جداً يا <b>${subOrder.customerName}</b>! 🥳<br>لقد قمنا بقبول طلبك ونبدأ الآن بتجهيزه بكل حب.',
         data: {'type': 'order', 'orderId': subOrderId},
       );
 
@@ -167,8 +168,9 @@ class OrderProvider extends ChangeNotifier {
       final subOrder = _pendingOrders.firstWhere((o) => o.id == subOrderId);
       NotificationService().sendNotification(
         targetUserId: subOrder.customerId,
-        title: 'تم رفض طلبك',
-        body: 'نعتذر، تم رفض طلبك. السبب: $reason',
+        title: '😔 نعتذر، تعذر تلبية طلبك ❌',
+        body:
+            'أهلاً بك يا <b>${subOrder.customerName}</b>، نأسف جداً لإخبارك أنه تم إلغاء طلبك.<br>السبب: <b>$reason</b>.<br>نتمنى رؤيتك قريباً في منتجات أخرى.',
         data: {'type': 'order', 'orderId': subOrderId},
       );
 
@@ -217,17 +219,26 @@ class OrderProvider extends ChangeNotifier {
       }
 
       if (subOrder != null) {
+        String statusTitle = '🔔 تحديث حالة طلبك';
         String statusText = '';
-        if (newStatus == SubOrderStatus.preparing)
-          statusText = 'طلبك قيد التجهيز';
-        if (newStatus == SubOrderStatus.readyForPickup)
-          statusText = 'طلبك جاهز للاستلام';
-        if (newStatus == SubOrderStatus.shipping) statusText = 'طلبك في الطريق';
+        if (newStatus == SubOrderStatus.preparing) {
+          statusTitle = '👨‍🍳 جارٍ تجهيز طلبك الرائع!';
+          statusText =
+              'نحن نعمل الآن بجهد لتحضير وتغليف طلبك 🎁.<br>استعد لتجربة استثنائية!';
+        } else if (newStatus == SubOrderStatus.readyForPickup) {
+          statusTitle = '🛍️ السعادة في انتظارك!';
+          statusText =
+              'طلبك أصبح جاهزاً بالكامل وينتظرك للاستلام من البازار 🏪.<br>لا تتأخر علينا!';
+        } else if (newStatus == SubOrderStatus.shipping) {
+          statusTitle = '🚚 طلبك انطلق في الطريق!';
+          statusText =
+              'مندوبنا البطل في طريقه إليك لتسليم الطلب 🛵.<br>تفضل بتجهيز نفسك للاستلام.';
+        }
 
         if (statusText.isNotEmpty) {
           NotificationService().sendNotification(
             targetUserId: subOrder.customerId,
-            title: 'تحديث حالة الطلب',
+            title: statusTitle,
             body: statusText,
             data: {'type': 'order', 'orderId': subOrderId},
           );
@@ -283,8 +294,9 @@ class OrderProvider extends ChangeNotifier {
       // Notify Customer
       NotificationService().sendNotification(
         targetUserId: subOrder.customerId,
-        title: 'تم استلام الطلب',
-        body: 'شكراً لك! نتمنى أن تستمتع بمشترياتك.',
+        title: '🎉 شكراً لتسوقك معنا! 💖',
+        body:
+            'تم استلام طلبك بنجاح من البازار.<br>نتمنى أن تنال منتجاتنا إعجابك، ولا تنسَ تقييمنا ⭐⭐⭐⭐⭐!',
         data: {'type': 'order', 'orderId': subOrder.id},
       );
 
@@ -315,8 +327,9 @@ class OrderProvider extends ChangeNotifier {
       if (subOrder != null) {
         NotificationService().sendNotification(
           targetUserId: subOrder.customerId,
-          title: 'تم توصيل الطلب',
-          body: 'تم توصيل طلبك بنجاح. شكراً لتسوقك معنا!',
+          title: '🎉 طلبك أصبح بين يديك! 📦',
+          body:
+              'تم توصيل طلبك بنجاح.<br>نتمنى لك وقتاً ممتعاً ولا تنسَ مشاركتنا رأيك الجميل ⭐⭐⭐⭐⭐!',
           data: {'type': 'order', 'orderId': subOrderId},
         );
       }

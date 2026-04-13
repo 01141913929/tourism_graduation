@@ -197,7 +197,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
               return SingleChildScrollView(
                 padding: const EdgeInsets.all(16),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.end,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     // Order items preview
                     _buildOrderItemsSection(appState),
@@ -305,7 +305,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -374,13 +374,13 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
           Expanded(
             flex: 2,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   item.product.nameAr,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.start,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -449,7 +449,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -537,7 +537,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
             Expanded(
               flex: 4,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     address.label,
@@ -554,7 +554,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                       fontSize: 12,
                       color: AppColors.textSecondary,
                     ),
-                    textAlign: TextAlign.right,
+                    textAlign: TextAlign.start,
                   ),
                 ],
               ),
@@ -628,7 +628,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'وسائل الدفع',
@@ -694,7 +694,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -741,7 +741,7 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                   ),
                   const Spacer(),
                   Column(
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
                         appState.appliedCoupon!.nameAr,
@@ -808,8 +808,8 @@ class _CheckoutScreenState extends State<CheckoutScreen> {
                 Expanded(
                   child: TextField(
                     controller: _couponController,
-                    textAlign: TextAlign.right,
-                    textDirection: TextDirection.rtl,
+                    textAlign: TextAlign.start,
+                    
                     decoration: InputDecoration(
                       hintText: 'أدخل كود الخصم',
                       hintStyle: const TextStyle(color: AppColors.textHint),

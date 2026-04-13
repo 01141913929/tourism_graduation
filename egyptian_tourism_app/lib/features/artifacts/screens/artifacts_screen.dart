@@ -102,8 +102,8 @@ class _ArtifactsScreenState extends State<ArtifactsScreen> {
                   Expanded(
                     child: TextField(
                       controller: _searchController,
-                      textAlign: TextAlign.right,
-                      textDirection: TextDirection.rtl,
+                      textAlign: TextAlign.start,
+                      
                       decoration: const InputDecoration(
                         hintText: 'ابحث عن أبرز التحف ...',
                         hintStyle: TextStyle(

@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
-import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
+import 'package:cloud_firestore/cloud_firestore.dart' hide Order;
+import 'package:intl/intl.dart';
 import '../../../core/constants/colors.dart';
 import '../../../models/models.dart';
 import '../../../models/sub_order_model.dart';
@@ -594,29 +595,183 @@ class _MyOrdersScreenState extends State<MyOrdersScreen>
             ),
           ],
 
-          // Show reorder button for delivered orders
+          // Show reorder and rate buttons for delivered orders
           if (isDelivered) ...[
-            const SizedBox(height: 8),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton.icon(
-                onPressed: () => _reorderItems(subOrder),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryOrange,
-                  foregroundColor: AppColors.white,
-                  padding: const EdgeInsets.symmetric(vertical: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    onPressed: () => _showRateDialog(subOrder),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.gold,
+                      side: const BorderSide(color: AppColors.gold),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Iconsax.star1, size: 18),
+                    label: const Text('تقييم'),
                   ),
                 ),
-                icon: const Icon(Iconsax.refresh, size: 18),
-                label: const Text('اطلب مرة أخرى'),
-              ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: ElevatedButton.icon(
+                    onPressed: () => _reorderItems(subOrder),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryOrange,
+                      foregroundColor: AppColors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                    ),
+                    icon: const Icon(Iconsax.refresh, size: 18),
+                    label: const Text('طلب مجدداً'),
+                  ),
+                ),
+              ],
             ),
           ],
         ],
       ),
     );
+  }
+
+  void _showRateDialog(SubOrder subOrder) {
+    double rating = 5;
+    final commentController = TextEditingController();
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Padding(
+        padding: EdgeInsets.only(
+          bottom: MediaQuery.of(ctx).viewInsets.bottom,
+        ),
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: const BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: StatefulBuilder(
+            builder: (ctx, setState) => Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.grey.shade300,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  'تقييم الطلب',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  subOrder.bazaarName,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: List.generate(5, (index) {
+                    return IconButton(
+                      onPressed: () => setState(() => rating = index + 1.0),
+                      icon: Icon(
+                        index < rating ? Iconsax.star1 : Icons.star_border,
+                        color: AppColors.gold,
+                        size: 40,
+                      ),
+                    );
+                  }),
+                ),
+                const SizedBox(height: 16),
+                TextField(
+                  controller: commentController,
+                  maxLines: 3,
+                  decoration: InputDecoration(
+                    hintText: 'اكتب تعليقك هنا...',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(12),
+                      borderSide: const BorderSide(color: AppColors.divider),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: () {
+                      _submitReview(subOrder, rating, commentController.text);
+                      Navigator.pop(ctx);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                            content: Text('تم إرسال التقييم بنجاح!')),
+                      );
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primaryOrange,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    child: const Text('إرسال التقييم',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white,
+                        )),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _submitReview(
+      SubOrder subOrder, double rating, String comment) async {
+    try {
+      final authProvider = context.read<AuthProvider>();
+      if (authProvider.userId == null) return;
+
+      // Submit a review doc
+      await FirebaseFirestore.instance.collection('reviews').add({
+        'targetId': subOrder.bazaarId,
+        'targetType': 'bazaar',
+        'targetName': subOrder.bazaarName,
+        'userId': authProvider.userId,
+        'userName': authProvider.user?.name ?? 'مستخدم',
+        'rating': rating,
+        'comment': comment,
+        'createdAt': DateTime.now().toIso8601String(),
+        'orderId': subOrder.id,
+      });
+    } catch (e) {
+      debugPrint('Error submitting review: $e');
+    }
   }
 
   Color _getStatusColor(SubOrderStatus status) {

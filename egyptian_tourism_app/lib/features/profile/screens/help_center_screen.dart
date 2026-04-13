@@ -170,7 +170,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                   padding: const EdgeInsets.all(20),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.end,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       const Icon(
                         Iconsax.message_question,
@@ -211,7 +211,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                         ),
                         child: TextField(
                           controller: _searchController,
-                          textAlign: TextAlign.right,
+                          textAlign: TextAlign.start,
                           decoration: InputDecoration(
                             hintText: 'ابحث عن سؤال...',
                             hintStyle: TextStyle(
@@ -315,7 +315,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
             'الأسئلة الشائعة',
@@ -378,7 +378,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
           ),
           children: [
             const Divider(),
@@ -420,7 +420,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
               fontWeight: FontWeight.w500,
               color: AppColors.textPrimary,
             ),
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
           ),
           children: [
             Text(
@@ -430,7 +430,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
                 color: AppColors.textSecondary,
                 height: 1.6,
               ),
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.start,
             ),
           ],
         ),
@@ -487,7 +487,7 @@ class _HelpCenterScreenState extends State<HelpCenterScreen> {
             Expanded(
               flex: 2,
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     'لازلت تحتاج المساعدة؟',

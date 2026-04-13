@@ -17,6 +17,7 @@ import 'reviews_screen.dart';
 import 'customer_messages_screen.dart';
 import 'coupons_screen.dart';
 import 'reports_screen.dart';
+import 'ai_insights_screen.dart';
 
 class DashboardScreen extends StatefulWidget {
   const DashboardScreen({super.key});
@@ -480,6 +481,30 @@ class _DashboardScreenState extends State<DashboardScreen>
                                       const CustomerMessagesScreen()),
                             ),
                           )),
+                        ],
+                      ),
+
+                      const SizedBox(height: 12),
+
+                      // Third row: AI Insights (Premium)
+                      Row(
+                        children: [
+                          Expanded(
+                              child: _buildQuickAction(
+                            icon: Iconsax.cpu,
+                            title: 'تحليلات AI',
+                            color: const Color(0xFF667eea),
+                            onTap: () => Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                  builder: (_) =>
+                                      const AIInsightsScreen()),
+                            ),
+                          )),
+                          const SizedBox(width: 12),
+                          Expanded(child: Container()),
+                          const SizedBox(width: 12),
+                          Expanded(child: Container()),
                         ],
                       ),
 

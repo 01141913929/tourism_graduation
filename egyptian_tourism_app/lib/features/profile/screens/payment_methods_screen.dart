@@ -178,7 +178,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
                             fontWeight: FontWeight.w700,
                             color: AppColors.textPrimary,
                           ),
-                          textAlign: TextAlign.right,
+                          textAlign: TextAlign.start,
                         ),
                       ),
 
@@ -528,7 +528,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
           const Spacer(),
           // Info
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
@@ -750,7 +750,7 @@ class _PaymentMethodsScreenState extends State<PaymentMethodsScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       child: TextField(
         controller: controller,
-        textAlign: TextAlign.right,
+        textAlign: TextAlign.start,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,

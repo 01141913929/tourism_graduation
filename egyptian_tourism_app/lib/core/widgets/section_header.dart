@@ -23,6 +23,15 @@ class SectionHeader extends StatelessWidget {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const Spacer(),
           if (actionText != null)
             TextButton(
               onPressed: onActionTap,
@@ -40,15 +49,6 @@ class SectionHeader extends StatelessWidget {
                 ),
               ),
             ),
-          const Spacer(),
-          Text(
-            title,
-            style: const TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.w700,
-              color: AppColors.textPrimary,
-            ),
-          ),
         ],
       ),
     );
@@ -155,8 +155,8 @@ class SearchBarWidget extends StatelessWidget {
             child: TextField(
               controller: controller,
               onChanged: onChanged,
-              textAlign: TextAlign.right,
-              textDirection: TextDirection.rtl,
+              textAlign: TextAlign.start,
+              // textDirection removed to use Directionality of context
               decoration: InputDecoration(
                 hintText: hintText,
                 hintStyle: const TextStyle(

@@ -6,6 +6,7 @@ import 'package:provider/provider.dart';
 import '../core/constants/colors.dart';
 import '../providers/auth_provider.dart';
 import '../services/notification_service.dart';
+import 'package:flutter/services.dart';
 
 /// شاشة المحادثة المرتبطة بالطلب
 class OrderChatScreen extends StatefulWidget {
@@ -183,8 +184,42 @@ class _OrderChatScreenState extends State<OrderChatScreen> {
         actions: [
           IconButton(
             icon: const Icon(Iconsax.call),
-            onPressed: () {
-              // TODO: Call customer
+            onPressed: () async {
+              // Get customer phone from Firestore
+              try {
+                final customerDoc = await _firestore
+                    .collection('users')
+                    .doc(widget.customerId)
+                    .get();
+                final phone = customerDoc.data()?['phone'] as String?;
+                if (phone != null && phone.isNotEmpty) {
+                  // Copy phone to clipboard and show dialog
+                  await Clipboard.setData(ClipboardData(text: phone));
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('تم نسخ رقم العميل: $phone'),
+                        action: SnackBarAction(
+                          label: 'اتصال',
+                          onPressed: () {},
+                        ),
+                      ),
+                    );
+                  }
+                } else {
+                  if (mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('لا يوجد رقم هاتف للعميل')),
+                    );
+                  }
+                }
+              } catch (e) {
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('خطأ: $e')),
+                  );
+                }
+              }
             },
           ),
         ],

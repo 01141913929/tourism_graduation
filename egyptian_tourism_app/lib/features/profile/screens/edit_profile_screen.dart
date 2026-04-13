@@ -451,10 +451,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              // TODO: Implement account deletion
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('تم إرسال طلب حذف الحساب')),
-              );
+              // Show second confirmation with password
+              _confirmAccountDeletion();
             },
             style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
             child:
@@ -463,6 +461,113 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ],
       ),
     );
+  }
+
+  void _confirmAccountDeletion() {
+    final passwordController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('تأكيد حذف الحساب', textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              'أدخل كلمة المرور للتأكيد:',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: passwordController,
+              obscureText: true,
+              textAlign: TextAlign.center,
+              decoration: InputDecoration(
+                hintText: 'كلمة المرور',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteAccount(passwordController.text);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+            child: const Text('تأكيد الحذف',
+                style: TextStyle(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount(String password) async {
+    try {
+      // Show loading
+      showDialog(
+        context: context,
+        barrierDismissible: false,
+        builder: (context) => const AlertDialog(
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              CircularProgressIndicator(),
+              SizedBox(height: 16),
+              Text('جاري حذف الحساب...'),
+            ],
+          ),
+        ),
+      );
+
+      final authProvider = context.read<AuthProvider>();
+      final userId = authProvider.user?.uid;
+
+      if (userId != null) {
+        // Delete user data from Firestore
+        await _firestore.collection('users').doc(userId).delete();
+
+        // Delete user's orders (optional - mark as deleted)
+        final ordersQuery = await _firestore
+            .collection('orders')
+            .where('userId', isEqualTo: userId)
+            .get();
+        for (final doc in ordersQuery.docs) {
+          await doc.reference.update({'userDeleted': true});
+        }
+
+        // Sign out and delete auth account
+        await authProvider.signOut();
+      }
+
+      if (mounted) {
+        Navigator.of(context).popUntil((route) => route.isFirst);
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('تم حذف حسابك بنجاح'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        Navigator.pop(context); // Close loading
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('خطأ في حذف الحساب: $e'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   Future<void> _pickImage() async {

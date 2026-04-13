@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:iconsax/iconsax.dart';
@@ -29,6 +30,7 @@ class _ChatScreenState extends State<ChatScreen> {
   final ScrollController _scrollController = ScrollController();
   final MessageService _messageService = MessageService();
 
+  StreamSubscription? _conversationSubscription;
   ConversationMessage? _conversation;
   bool _isLoading = true;
   bool _isSending = false;
@@ -36,28 +38,29 @@ class _ChatScreenState extends State<ChatScreen> {
   @override
   void initState() {
     super.initState();
-    _loadConversation();
+    _subscribeToConversation();
   }
 
-  Future<void> _loadConversation() async {
-    setState(() => _isLoading = true);
-
-    try {
-      final doc = await _firestore
-          .collection('messages')
-          .doc(widget.conversationId)
-          .get();
-
-      if (doc.exists) {
-        _conversation =
-            ConversationMessage.fromJson({...doc.data()!, 'id': doc.id});
+  void _subscribeToConversation() {
+    _conversationSubscription = _firestore
+        .collection('messages')
+        .doc(widget.conversationId)
+        .snapshots()
+        .listen((doc) {
+      if (doc.exists && mounted) {
+        setState(() {
+          _conversation =
+              ConversationMessage.fromJson({...doc.data()!, 'id': doc.id});
+          _isLoading = false;
+        });
+        _scrollToBottom();
+      } else if (mounted) {
+        setState(() => _isLoading = false);
       }
-    } catch (e) {
-      debugPrint('Error loading conversation: $e');
-    }
-
-    setState(() => _isLoading = false);
-    _scrollToBottom();
+    }, onError: (e) {
+      debugPrint('Error streaming conversation: $e');
+      if (mounted) setState(() => _isLoading = false);
+    });
   }
 
   void _scrollToBottom() {
@@ -97,7 +100,7 @@ class _ChatScreenState extends State<ChatScreen> {
       if (_conversation != null) {
         NotificationService().sendNotification(
           targetUserId: _conversation!.bazaarId,
-          title: 'رسالة جديدة من $userName',
+          title: '💬 رسالة جديدة من <b>$userName</b>!',
           body: text,
           data: {
             'type': 'chat',
@@ -107,7 +110,7 @@ class _ChatScreenState extends State<ChatScreen> {
       }
 
       _messageController.clear();
-      await _loadConversation();
+      // No need to manually reload — the stream will update automatically
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -225,7 +228,7 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
         child: Column(
           crossAxisAlignment:
-              isMe ? CrossAxisAlignment.end : CrossAxisAlignment.start,
+              isMe ? CrossAxisAlignment.start : CrossAxisAlignment.start,
           children: [
             if (!isMe)
               Padding(
@@ -335,7 +338,6 @@ class _ChatScreenState extends State<ChatScreen> {
           Expanded(
             child: TextField(
               controller: _messageController,
-              textDirection: TextDirection.rtl,
               maxLines: 4,
               minLines: 1,
               decoration: InputDecoration(
@@ -361,6 +363,7 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   void dispose() {
+    _conversationSubscription?.cancel();
     _messageController.dispose();
     _scrollController.dispose();
     super.dispose();

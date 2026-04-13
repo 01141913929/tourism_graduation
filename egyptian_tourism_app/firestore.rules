@@ -69,6 +69,11 @@ service cloud.firestore {
       match /payment_methods/{methodId} {
         allow read, write: if isOwner(userId);
       }
+
+      // FCM Tokens subcollection
+      match /fcm_tokens/{tokenId} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
     // ===== Products Collection =====
@@ -80,9 +85,9 @@ service cloud.firestore {
       allow create: if isBazaarOwner() && 
         request.resource.data.bazaarId == getUserBazaarId();
       
-      // Bazaar owners can update their own products
-      allow update: if isBazaarOwner() && 
-        resource.data.bazaarId == getUserBazaarId();
+      // Bazaar owners can update their own products, OR authenticated users can update stock when buying
+      allow update: if (isBazaarOwner() && resource.data.bazaarId == getUserBazaarId()) ||
+        (isAuthenticated() && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['stock', 'soldCount']));
       
       // Bazaar owners can delete their own products
       allow delete: if isBazaarOwner() && 
@@ -111,9 +116,7 @@ service cloud.firestore {
     // ===== Orders Collection (Parent Orders) =====
     match /orders/{orderId} {
       // FIXED: Allow authenticated users to LIST their own orders (query by userId)
-      // This allows queries with where('userId', '==', uid)
-      allow list: if isAuthenticated() && 
-        request.query.limit <= 100;
+      allow list: if isAuthenticated();
       
       // Users can read their own orders by ID
       allow get: if isAuthenticated() && resource.data.userId == request.auth.uid;
@@ -166,6 +169,16 @@ service cloud.firestore {
       
       // No deletion
       allow delete: if false;
+    }
+    
+    // ===== AI Chat History Collection =====
+    match /chats/{userId} {
+      // المستخدم يقرأ/يكتب محادثاته فقط
+      allow read, write: if isOwner(userId);
+      
+      match /messages/{messageId} {
+        allow read, write: if isOwner(userId);
+      }
     }
     
     // ===== Cart Collection =====

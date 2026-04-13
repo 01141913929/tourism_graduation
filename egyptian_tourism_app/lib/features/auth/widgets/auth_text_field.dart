@@ -29,7 +29,7 @@ class AuthTextField extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         // Label
         Padding(
@@ -49,8 +49,8 @@ class AuthTextField extends StatelessWidget {
           controller: controller,
           obscureText: obscureText,
           keyboardType: keyboardType,
-          textAlign: TextAlign.right,
-          textDirection: TextDirection.rtl,
+          textAlign: TextAlign.start,
+          
           style: const TextStyle(
             fontSize: 16,
             color: AppColors.textPrimary,

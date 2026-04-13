@@ -136,7 +136,7 @@ class _CartScreenState extends State<CartScreen> {
                             Expanded(
                               child: TextField(
                                 controller: _couponController,
-                                textAlign: TextAlign.right,
+                                textAlign: TextAlign.start,
                                 decoration: const InputDecoration(
                                   hintText: 'أدخل كود الخصم',
                                   hintStyle: TextStyle(
@@ -286,13 +286,13 @@ class _CartScreenState extends State<CartScreen> {
           Expanded(
             flex: 2,
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   item.product.nameAr,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  textAlign: TextAlign.right,
+                  textAlign: TextAlign.start,
                   style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
@@ -308,10 +308,12 @@ class _CartScreenState extends State<CartScreen> {
                   ),
                 ),
                 const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.end,
+                Wrap(
+                  alignment: WrapAlignment.end,
+                  crossAxisAlignment: WrapCrossAlignment.center,
+                  spacing: 6,
                   children: [
-                    if (item.product.hasDiscount) ...[
+                    if (item.product.hasDiscount)
                       Text(
                         '\$${(item.product.oldPrice! / 50).toStringAsFixed(2)}',
                         style: const TextStyle(
@@ -320,8 +322,6 @@ class _CartScreenState extends State<CartScreen> {
                           decoration: TextDecoration.lineThrough,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                    ],
                     Text(
                       '\$${(item.product.price / 50).toStringAsFixed(2)}',
                       style: const TextStyle(

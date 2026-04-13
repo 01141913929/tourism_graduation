@@ -1,15 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../models/models.dart';
 import '../../../models/bazaar_model.dart';
+import '../../../models/message_model.dart';
 import '../../../repositories/bazaar_repository.dart';
 import '../../../repositories/product_repository.dart';
 import '../../../services/share_service.dart';
+import '../../../providers/auth_provider.dart';
 import '../../products/screens/product_details_screen.dart';
+import '../../profile/screens/chat_screen.dart';
 import '../../../core/widgets/product_card.dart';
+import 'package:provider/provider.dart';
+import '../../../providers/language_provider.dart';
 
 /// شاشة تفاصيل البازار
 class BazaarDetailsScreen extends StatefulWidget {
@@ -89,6 +95,100 @@ class _BazaarDetailsScreenState extends State<BazaarDetailsScreen> {
               RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
         ),
       );
+    }
+  }
+
+  Future<void> _startConversation() async {
+    if (_bazaar == null) return;
+    final authProvider = context.read<AuthProvider>();
+    final userId = authProvider.userId;
+    final userName = authProvider.user?.name ?? 'سائح';
+
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('يرجى تسجيل الدخول أولاً'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
+      return;
+    }
+
+    try {
+      // Check if conversation already exists
+      final existing = await FirebaseFirestore.instance
+          .collection('messages')
+          .where('customerId', isEqualTo: userId)
+          .where('bazaarId', isEqualTo: _bazaar!.id)
+          .limit(1)
+          .get();
+
+      String conversationId;
+
+      if (existing.docs.isNotEmpty) {
+        conversationId = existing.docs.first.id;
+      } else {
+        // Create new conversation
+        final bazaarName = _bazaar!.getDisplayName(preferArabic: true);
+        final now = DateTime.now();
+        final newConversation = ConversationMessage(
+          id: '',
+          customerId: userId,
+          customerName: userName,
+          bazaarId: _bazaar!.id,
+          bazaarName: bazaarName,
+          subject: 'استفسار عن $bazaarName',
+          initialMessage: 'مرحباً، أريد الاستفسار عن منتجاتكم',
+          createdAt: now,
+          lastMessageAt: now,
+          status: MessageStatus.sent,
+          replies: [
+            MessageReply(
+              id: now.millisecondsSinceEpoch.toString(),
+              senderId: userId,
+              senderName: userName,
+              senderType: 'customer',
+              content: 'مرحباً، أريد الاستفسار عن منتجاتكم',
+              createdAt: now,
+            ),
+          ],
+        );
+
+        final docRef = await FirebaseFirestore.instance
+            .collection('messages')
+            .add(newConversation.toJson());
+        conversationId = docRef.id;
+      }
+
+      if (mounted) {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ChatScreen(
+              conversationId: conversationId,
+              bazaarName: _bazaar!.getDisplayName(preferArabic: true),
+            ),
+          ),
+        );
+      }
+    } catch (e) {
+      debugPrint('Error starting conversation: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: const Text('خطأ في بدء المحادثة'),
+            backgroundColor: AppColors.error,
+            behavior: SnackBarBehavior.floating,
+            shape:
+                RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+        );
+      }
     }
   }
 
@@ -202,7 +302,9 @@ class _BazaarDetailsScreenState extends State<BazaarDetailsScreen> {
                         ),
                         const SizedBox(height: 8),
                         Text(
-                          _bazaar!.nameAr,
+                          _bazaar!.getDisplayName(
+                              preferArabic:
+                                  context.watch<LanguageProvider>().isArabic),
                           style: const TextStyle(
                             color: Colors.white,
                             fontSize: 24,
@@ -248,6 +350,15 @@ class _BazaarDetailsScreenState extends State<BazaarDetailsScreen> {
                     children: [
                       Expanded(
                         child: _buildActionButton(
+                          icon: Iconsax.message,
+                          label: 'راسل',
+                          onTap: _startConversation,
+                          color: AppColors.primaryOrange,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: _buildActionButton(
                           icon: Iconsax.call,
                           label: 'اتصل',
                           onTap: _launchPhone,
@@ -280,7 +391,9 @@ class _BazaarDetailsScreenState extends State<BazaarDetailsScreen> {
                   _buildSection(
                     title: 'عن البازار',
                     child: Text(
-                      _bazaar!.descriptionAr,
+                      _bazaar!.getDisplayDescription(
+                          preferArabic:
+                              context.watch<LanguageProvider>().isArabic),
                       style: TextStyle(
                         color: Colors.grey[700],
                         height: 1.6,

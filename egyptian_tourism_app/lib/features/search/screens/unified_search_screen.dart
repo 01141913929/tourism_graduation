@@ -191,7 +191,7 @@ class _UnifiedSearchScreenState extends State<UnifiedSearchScreen>
           controller: _searchController,
           focusNode: _searchFocusNode,
           textInputAction: TextInputAction.search,
-          textDirection: TextDirection.rtl,
+          
           style: const TextStyle(fontSize: 15),
           decoration: InputDecoration(
             hintText: 'ابحث عن منتجات أو بازارات...',

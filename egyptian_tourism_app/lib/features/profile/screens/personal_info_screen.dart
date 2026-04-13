@@ -353,7 +353,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
                               ],
                             ),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.end,
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
                                   mainAxisAlignment: MainAxisAlignment.end,
@@ -475,7 +475,7 @@ class _PersonalInfoScreenState extends State<PersonalInfoScreen> {
         readOnly: readOnly,
         keyboardType: keyboardType,
         onTap: onTap,
-        textAlign: TextAlign.right,
+        textAlign: TextAlign.start,
         style: TextStyle(
           fontSize: 15,
           fontWeight: FontWeight.w500,

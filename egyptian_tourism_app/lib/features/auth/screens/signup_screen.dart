@@ -420,7 +420,7 @@ class _SignupScreenState extends State<SignupScreen>
               const Spacer(),
               // Title
               Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
                     AppStringsAr.createNewAccount,

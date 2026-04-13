@@ -1,0 +1,12 @@
+﻿Analyzing home_screen.dart...
+
+warning - home_screen.dart:7:8 - Unused import: '../../../core/constants/strings_ar.dart'. Try removing the import directive. - unused_import
+warning - home_screen.dart:44:24 - The value of the field '_categories' isn't used. Try removing the field, or using it. - unused_field
+   info - home_screen.dart:848:22 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+   info - home_screen.dart:849:27 - Use 'const' literals as arguments to constructors of '@immutable' classes. Try adding 'const' before the literal. - prefer_const_literals_to_create_immutables
+   info - home_screen.dart:850:19 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+   info - home_screen.dart:856:19 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+   info - home_screen.dart:858:28 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+   info - home_screen.dart:1155:31 - Use 'const' with the constructor to improve performance. Try adding the 'const' keyword to the constructor invocation. - prefer_const_constructors
+
+8 issues found.

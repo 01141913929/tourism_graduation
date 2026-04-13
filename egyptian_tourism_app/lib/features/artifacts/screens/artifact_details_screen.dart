@@ -249,7 +249,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.end,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Title
             Text(
@@ -259,7 +259,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
                 fontWeight: FontWeight.w800,
                 color: AppColors.textPrimary,
               ),
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.start,
             ),
             const SizedBox(height: 12),
 
@@ -337,7 +337,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
                 color: AppColors.textSecondary,
                 height: 1.8,
               ),
-              textAlign: TextAlign.right,
+              textAlign: TextAlign.start,
             ),
             const SizedBox(height: 24),
 
@@ -410,7 +410,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
         borderRadius: BorderRadius.circular(12),
       ),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.end,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.end,
@@ -438,7 +438,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
             ),
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
           ),
         ],
       ),
@@ -481,7 +481,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
           ),
           const Spacer(),
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 'جولة صوتية',
@@ -516,7 +516,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
     final related = _relatedArtifacts;
 
     return Column(
-      crossAxisAlignment: CrossAxisAlignment.end,
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
           'تحف مشابهة',
@@ -572,7 +572,7 @@ class _ArtifactDetailsScreenState extends State<ArtifactDetailsScreen> {
                         child: Padding(
                           padding: const EdgeInsets.all(10),
                           child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
+                            crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               Text(
                                 artifact.nameAr,

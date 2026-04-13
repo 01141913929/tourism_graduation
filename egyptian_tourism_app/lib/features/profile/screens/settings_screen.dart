@@ -3,7 +3,12 @@ import 'package:flutter/services.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:provider/provider.dart';
 import '../../../core/constants/colors.dart';
+import '../../../core/localization/app_strings.dart';
 import '../../../providers/language_provider.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../services/share_service.dart';
+import 'personal_info_screen.dart';
+import 'help_center_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -34,9 +39,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             size: 20,
           ),
         ),
-        title: const Text(
-          'الإعدادات',
-          style: TextStyle(
+        title: Text(
+          AppStrings.settings,
+          style: const TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
@@ -47,36 +52,42 @@ class _SettingsScreenState extends State<SettingsScreen> {
         padding: const EdgeInsets.all(16),
         children: [
           // Account Section
-          _buildSectionHeader('الحساب'),
+          _buildSectionHeader(AppStrings.isArabic ? 'الحساب' : 'Account'),
           _buildSettingsCard([
             _buildNavigationItem(
               icon: Iconsax.user,
-              title: 'معلوماتي الشخصية',
-              onTap: () {},
+              title: AppStrings.personalInfo,
+              onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                      builder: (_) => const PersonalInfoScreen())),
             ),
             _buildDivider(),
             _buildNavigationItem(
               icon: Iconsax.lock,
-              title: 'الأمان',
-              onTap: () {},
+              title: AppStrings.isArabic ? 'الأمان' : 'Security',
+              onTap: () => _showSecurityDialog(),
             ),
             _buildDivider(),
             _buildNavigationItem(
               icon: Iconsax.shield_tick,
-              title: 'الخصوصية',
-              onTap: () {},
+              title: AppStrings.isArabic ? 'الخصوصية' : 'Privacy',
+              onTap: () => _showPrivacyDialog(),
             ),
           ]),
 
           const SizedBox(height: 24),
 
           // Preferences Section
-          _buildSectionHeader('التفضيلات'),
+          _buildSectionHeader(
+              AppStrings.isArabic ? 'التفضيلات' : 'Preferences'),
           _buildSettingsCard([
             _buildSwitchItem(
               icon: Iconsax.notification,
-              title: 'الإشعارات',
-              subtitle: 'استلام إشعارات الطلبات والعروض',
+              title: AppStrings.isArabic ? 'الإشعارات' : 'Notifications',
+              subtitle: AppStrings.isArabic
+                  ? 'استلام إشعارات الطلبات والعروض'
+                  : 'Receive order & offer notifications',
               value: _notificationsEnabled,
               onChanged: (value) {
                 setState(() {
@@ -88,8 +99,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildDivider(),
             _buildSwitchItem(
               icon: Iconsax.moon,
-              title: 'الوضع الليلي',
-              subtitle: 'تفعيل المظهر الداكن',
+              title: AppStrings.isArabic ? 'الوضع الليلي' : 'Dark Mode',
+              subtitle: AppStrings.isArabic
+                  ? 'تفعيل المظهر الداكن'
+                  : 'Enable dark theme',
               value: _darkModeEnabled,
               onChanged: (value) {
                 setState(() {
@@ -101,8 +114,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             _buildDivider(),
             _buildSwitchItem(
               icon: Iconsax.finger_scan,
-              title: 'البصمة',
-              subtitle: 'تسجيل الدخول ببصمة الإصبع',
+              title: AppStrings.isArabic ? 'البصمة' : 'Fingerprint',
+              subtitle: AppStrings.isArabic
+                  ? 'تسجيل الدخول ببصمة الإصبع'
+                  : 'Login using fingerprint',
               value: _biometricEnabled,
               onChanged: (value) {
                 setState(() {
@@ -118,30 +133,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const SizedBox(height: 24),
 
           // Support Section
-          _buildSectionHeader('الدعم'),
+          _buildSectionHeader(AppStrings.isArabic ? 'الدعم' : 'Support'),
           _buildSettingsCard([
             _buildNavigationItem(
               icon: Iconsax.message_question,
-              title: 'مركز المساعدة',
-              onTap: () {},
+              title: AppStrings.helpCenter,
+              onTap: () => Navigator.push(context,
+                  MaterialPageRoute(builder: (_) => const HelpCenterScreen())),
             ),
             _buildDivider(),
             _buildNavigationItem(
               icon: Iconsax.info_circle,
-              title: 'عن التطبيق',
+              title: AppStrings.aboutUs,
               onTap: () => _showAboutDialog(),
             ),
             _buildDivider(),
             _buildNavigationItem(
               icon: Iconsax.star,
-              title: 'قيم التطبيق',
-              onTap: () {},
+              title: AppStrings.isArabic ? 'قيم التطبيق' : 'Rate App',
+              onTap: () => _showRateAppDialog(),
             ),
             _buildDivider(),
             _buildNavigationItem(
               icon: Iconsax.share,
-              title: 'شارك التطبيق',
-              onTap: () {},
+              title: AppStrings.isArabic ? 'شارك التطبيق' : 'Share App',
+              onTap: () => _shareApp(),
             ),
           ]),
 
@@ -151,14 +167,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildSettingsCard([
             _buildNavigationItem(
               icon: Iconsax.logout,
-              title: 'تسجيل الخروج',
+              title: AppStrings.logout,
               isDestructive: true,
-              onTap: () {},
+              onTap: () => _showLogoutDialog(),
             ),
             _buildDivider(),
             _buildNavigationItem(
               icon: Iconsax.trash,
-              title: 'حذف الحساب',
+              title: AppStrings.isArabic ? 'حذف الحساب' : 'Delete Account',
               isDestructive: true,
               onTap: () => _showDeleteAccountDialog(),
             ),
@@ -219,7 +235,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           fontWeight: FontWeight.w700,
           color: AppColors.textPrimary,
         ),
-        textAlign: TextAlign.right,
+        textAlign: TextAlign.start,
       ),
     );
   }
@@ -308,7 +324,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ),
           const Spacer(),
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
                 title,
@@ -451,9 +467,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ),
             ),
             const Spacer(),
-            const Text(
-              'اللغة',
-              style: TextStyle(
+            Text(
+              AppStrings.isArabic ? 'اللغة' : 'Language',
+              style: const TextStyle(
                 fontSize: 15,
                 fontWeight: FontWeight.w500,
                 color: AppColors.textPrimary,
@@ -550,7 +566,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               Icon(Icons.circle_outlined, color: AppColors.textHint, size: 24),
             const Spacer(),
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   title,
@@ -758,6 +774,168 @@ class _SettingsScreenState extends State<SettingsScreen> {
             ),
           ],
         ),
+      ),
+    );
+  }
+
+  void _showSecurityDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('الأمان',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildSecurityOption(Iconsax.lock, 'تغيير كلمة المرور'),
+            const SizedBox(height: 12),
+            _buildSecurityOption(Iconsax.finger_scan, 'البصمة'),
+            const SizedBox(height: 12),
+            _buildSecurityOption(Iconsax.shield_tick, 'التحقق بخطوتين'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إغلاق'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSecurityOption(IconData icon, String title) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.background,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.arrow_back_ios, size: 16, color: AppColors.textHint),
+          const Spacer(),
+          Text(title, style: const TextStyle(fontWeight: FontWeight.w500)),
+          const SizedBox(width: 12),
+          Icon(icon, color: AppColors.primaryOrange),
+        ],
+      ),
+    );
+  }
+
+  void _showPrivacyDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('سياسة الخصوصية',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const SingleChildScrollView(
+          child: Text(
+            'نحن نحترم خصوصيتك ونلتزم بحماية بياناتك الشخصية.\n\n'
+            '• نجمع المعلومات الضرورية لتقديم خدماتنا\n'
+            '• لا نشارك بياناتك مع أطراف ثالثة\n'
+            '• نستخدم التشفير لحماية معلوماتك\n'
+            '• يمكنك طلب حذف بياناتك في أي وقت\n\n'
+            'للمزيد من المعلومات، تواصل معنا عبر البريد الإلكتروني.',
+            style: TextStyle(height: 1.6),
+            textAlign: TextAlign.start,
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('حسناً'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showRateAppDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        contentPadding: const EdgeInsets.all(24),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Iconsax.star1, size: 48, color: Color(0xFFf8b500)),
+            const SizedBox(height: 16),
+            const Text('قيّم التطبيق',
+                style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700)),
+            const SizedBox(height: 8),
+            Text('رأيك يهمنا! ساعدنا في تحسين التطبيق',
+                style: TextStyle(color: AppColors.textSecondary),
+                textAlign: TextAlign.center),
+            const SizedBox(height: 20),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: List.generate(
+                  5,
+                  (i) => Icon(
+                        Iconsax.star1,
+                        size: 36,
+                        color: i < 4
+                            ? const Color(0xFFf8b500)
+                            : AppColors.textHint,
+                      )),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: () => Navigator.pop(context),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: const Color(0xFFf8b500),
+                minimumSize: const Size(double.infinity, 48),
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+              child: const Text('إرسال',
+                  style: TextStyle(
+                      color: Colors.white, fontWeight: FontWeight.w600)),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareApp() {
+    ShareService.shareApp();
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم نسخ رابط التطبيق! يمكنك مشاركته الآن')),
+    );
+  }
+
+  void _showLogoutDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('تسجيل الخروج',
+            textAlign: TextAlign.center,
+            style: TextStyle(fontWeight: FontWeight.w700)),
+        content: const Text('هل أنت متأكد من تسجيل الخروج؟',
+            textAlign: TextAlign.center),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              context.read<AuthProvider>().signOut();
+              Navigator.of(context).popUntil((route) => route.isFirst);
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.error),
+            child: const Text('خروج', style: TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
     );
   }

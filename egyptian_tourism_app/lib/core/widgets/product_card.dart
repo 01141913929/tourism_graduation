@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/constants/colors.dart';
 import '../../models/models.dart';
+import 'package:provider/provider.dart';
+import '../../providers/language_provider.dart';
 
 /// Product card widget for shop items
 class ProductCard extends StatelessWidget {
@@ -123,7 +125,8 @@ class ProductCard extends StatelessWidget {
                   children: [
                     Expanded(
                       child: Text(
-                        product.nameAr,
+                        product.getName(
+                            context.watch<LanguageProvider>().isArabic),
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -257,7 +260,7 @@ class ArtifactCard extends StatelessWidget {
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
                 child: Text(
-                  artifact.nameAr,
+                  artifact.getName(context.watch<LanguageProvider>().isArabic),
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   textAlign: TextAlign.center,

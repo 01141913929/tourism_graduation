@@ -418,7 +418,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
         Expanded(
           child: Text(
             text,
-            textAlign: TextAlign.right,
+            textAlign: TextAlign.start,
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
@@ -642,7 +642,7 @@ class _AddressesScreenState extends State<AddressesScreen> {
       margin: const EdgeInsets.only(bottom: 16),
       child: TextField(
         controller: controller,
-        textAlign: TextAlign.right,
+        textAlign: TextAlign.start,
         decoration: InputDecoration(
           labelText: label,
           hintText: hint,

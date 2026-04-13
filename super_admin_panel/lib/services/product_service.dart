@@ -10,9 +10,9 @@ import '../models/category_model.dart';
 class ProductService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
 
-  // Cloudinary configuration - to be set by user
-  static String cloudinaryCloudName = '';
-  static String cloudinaryUploadPreset = '';
+  // Cloudinary configuration - default values from bazaar_owner_app
+  static String cloudinaryCloudName = 'dlkpme30u';
+  static String cloudinaryUploadPreset = 'tourism';
 
   /// Configure Cloudinary credentials
   static void configureCloudinary({

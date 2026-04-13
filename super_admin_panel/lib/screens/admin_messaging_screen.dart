@@ -267,6 +267,91 @@ class _AdminMessagingScreenState extends State<AdminMessagingScreen>
     }
   }
 
+  void _showBroadcastNotificationDialog() {
+    final titleController = TextEditingController();
+    final bodyController = TextEditingController();
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Row(
+          children: [
+            Icon(Iconsax.notification, color: AppColors.primary),
+            SizedBox(width: 8),
+            Text('إرسال إشعار عام'),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: titleController,
+              decoration: InputDecoration(
+                labelText: 'عنوان الإشعار',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextField(
+              controller: bodyController,
+              maxLines: 3,
+              decoration: InputDecoration(
+                labelText: 'نص الإشعار',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton.icon(
+            onPressed: () async {
+              if (titleController.text.isNotEmpty &&
+                  bodyController.text.isNotEmpty) {
+                Navigator.pop(context);
+                // Save notification to Firestore for all bazaars
+                for (final bazaar in _bazaars) {
+                  await _firestore.collection('adminNotifications').add({
+                    'title': titleController.text,
+                    'message': bodyController.text,
+                    'targetType': 'broadcast',
+                    'targetBazaarId': bazaar['id'],
+                    'createdAt': DateTime.now().toIso8601String(),
+                    'isRead': false,
+                  });
+                }
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content:
+                          Text('تم إرسال الإشعار لـ ${_bazaars.length} بازار'),
+                      backgroundColor: AppColors.success,
+                    ),
+                  );
+                }
+                _loadData();
+              }
+            },
+            icon: const Icon(Iconsax.send_1),
+            label: const Text('إرسال للجميع'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Map<String, dynamic>> get _filteredBazaars {
     if (_searchQuery.isEmpty) return _bazaars;
     return _bazaars
@@ -491,9 +576,7 @@ class _AdminMessagingScreenState extends State<AdminMessagingScreen>
           ),
           const SizedBox(height: 8),
           ElevatedButton.icon(
-            onPressed: () {
-              // TODO: Implement push notifications
-            },
+            onPressed: () => _showBroadcastNotificationDialog(),
             icon: const Icon(Iconsax.send_2),
             label: const Text('إرسال إشعار عام'),
             style: ElevatedButton.styleFrom(

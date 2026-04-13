@@ -15,42 +15,63 @@ if (!admin.apps.length) {
   }
 }
 
-exports.handler = async function(event, context) {
+exports.handler = async function (event, context) {
+  // CORS Headers
+  const headers = {
+    'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Headers': 'Content-Type, Accept',
+    'Access-Control-Allow-Methods': 'OPTIONS, POST',
+  };
+
+  // Handle preflight OPTIONS request
+  if (event.httpMethod === 'OPTIONS') {
+    return { statusCode: 204, headers, body: '' };
+  }
+
   // Only allow POST requests
   if (event.httpMethod !== 'POST') {
-    return { statusCode: 405, body: 'Method Not Allowed' };
+    return { statusCode: 405, headers, body: 'Method Not Allowed' };
   }
 
   try {
     const { targetUserId, title, body, data } = JSON.parse(event.body);
 
     if (!targetUserId || !title || !body) {
-      return { statusCode: 400, body: 'Missing required fields: targetUserId, title, body' };
+      return { statusCode: 400, headers, body: 'Missing required fields: targetUserId, title, body' };
     }
 
     console.log(`Sending notification to user: ${targetUserId}`);
 
-    // 1. Get the user's FCM token from Firestore
-    // Path: users/{uid}/fcm_tokens/token
-    // Note: A user might have multiple devices. For simplicity, we'll fetch one or all.
-    // Let's assume we store the main token in the user document or a subcollection.
-    // Best practice: Subcollection 'fcm_tokens' where document ID is the token.
-    
     const db = admin.firestore();
+    let tokens = [];
+
+    // 1. Check the fcm_tokens subcollection (used by bazaar_owner_app & super_admin_panel)
     const tokensSnapshot = await db
       .collection('users')
       .doc(targetUserId)
       .collection('fcm_tokens')
       .get();
 
-    if (tokensSnapshot.empty) {
-        console.log(`No tokens found for user: ${targetUserId}`);
-        return { statusCode: 200, body: 'User has no registered devices.' };
+    if (!tokensSnapshot.empty) {
+      tokens = tokensSnapshot.docs.map(doc => doc.id);
+    } else {
+      // 2. Fall back to checking the user document (used by egyptian_tourism_app)
+      console.log(`No tokens in subcollection for user ${targetUserId}, checking user document...`);
+      const userDoc = await db.collection('users').doc(targetUserId).get();
+      if (userDoc.exists) {
+        const userData = userDoc.data();
+        if (userData.fcmToken) {
+          tokens = [userData.fcmToken];
+        }
+      }
     }
 
-    const tokens = tokensSnapshot.docs.map(doc => doc.id); // Assuming doc ID is the token
+    if (tokens.length === 0) {
+      console.log(`No tokens found for user: ${targetUserId}`);
+      return { statusCode: 200, headers, body: JSON.stringify({ success: false, message: 'User has no registered devices.' }) };
+    }
 
-    // 2. Construct the message payload
+    // Construct the message payload
     const message = {
       notification: {
         title: title,
@@ -60,25 +81,25 @@ exports.handler = async function(event, context) {
       tokens: tokens,
     };
 
-    // 3. Send via FCM Multicast (to all user's devices)
+    // Send via FCM Multicast (to all user's devices)
     const response = await admin.messaging().sendEachForMulticast(message);
 
     console.log(`${response.successCount} messages were sent successfully`);
 
     // Cleanup invalid tokens (optional but recommended)
     if (response.failureCount > 0) {
-        const failedTokens = [];
-        response.responses.forEach((resp, idx) => {
-            if (!resp.success) {
-                failedTokens.push(tokens[idx]);
-            }
-        });
-        // Logic to delete failedTokens from Firestore could go here
-        console.log('Failed tokens:', failedTokens);
+      const failedTokens = [];
+      response.responses.forEach((resp, idx) => {
+        if (!resp.success) {
+          failedTokens.push(tokens[idx]);
+        }
+      });
+      console.log('Failed tokens (should be investigated or deleted):', failedTokens);
     }
 
     return {
       statusCode: 200,
+      headers,
       body: JSON.stringify({ success: true, sentCount: response.successCount }),
     };
 
@@ -86,6 +107,7 @@ exports.handler = async function(event, context) {
     console.error('Notification Error:', error);
     return {
       statusCode: 500,
+      headers,
       body: JSON.stringify({ error: error.message }),
     };
   }

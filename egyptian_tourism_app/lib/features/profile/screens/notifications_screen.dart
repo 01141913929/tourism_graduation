@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
 import '../../../core/constants/colors.dart';
 import '../../../providers/auth_provider.dart';
+import '../../../services/data_seeder_service.dart';
 
 /// نموذج الإشعار
 class NotificationModel {
@@ -28,13 +29,14 @@ class NotificationModel {
 
   factory NotificationModel.fromJson(Map<String, dynamic> json) {
     return NotificationModel(
-      id: json['id'] as String,
+      id: json['id'] as String? ?? '',
       type: json['type'] as String? ?? 'system',
-      title: json['title'] as String,
-      body: json['body'] as String,
+      title: json['title'] as String? ?? '',
+      body: json['body'] as String? ?? '',
       data: json['data'] as Map<String, dynamic>?,
-      read: json['read'] as bool? ?? false,
-      createdAt: DateTime.parse(json['createdAt'] as String),
+      read: json['isRead'] as bool? ?? json['read'] as bool? ?? false,
+      createdAt: DateTime.tryParse(json['createdAt']?.toString() ?? '') ??
+          DateTime.now(),
     );
   }
 }
@@ -68,6 +70,9 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
         return;
       }
 
+      // Seed sample notifications on first open
+      await DataSeederService().seedUserNotifications(userId);
+
       final snapshot = await _firestore
           .collection('notifications')
           .where('userId', isEqualTo: userId)
@@ -88,7 +93,8 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
   Future<void> _markAsRead(String notificationId) async {
     try {
       await _firestore.collection('notifications').doc(notificationId).update({
-        'read': true,
+        'isRead': true,
+        'readAt': DateTime.now().toIso8601String(),
       });
 
       setState(() {
@@ -117,10 +123,11 @@ class _NotificationsScreenState extends State<NotificationsScreen> {
       if (userId == null) return;
 
       final batch = _firestore.batch();
+      final now = DateTime.now().toIso8601String();
       for (final notification in _notifications.where((n) => !n.read)) {
         batch.update(
           _firestore.collection('notifications').doc(notification.id),
-          {'read': true},
+          {'isRead': true, 'readAt': now},
         );
       }
       await batch.commit();

@@ -59,6 +59,16 @@ class Product {
     return ((oldPrice! - price) / oldPrice! * 100).roundToDouble();
   }
 
+  String getName(bool isArabic) {
+    if (isArabic) return nameAr;
+    return nameEn.isNotEmpty ? nameEn : nameAr;
+  }
+
+  String getDescription(bool isArabic) {
+    if (isArabic) return descriptionAr;
+    return descriptionEn.isNotEmpty ? descriptionEn : descriptionAr;
+  }
+
   factory Product.fromJson(Map<String, dynamic> json) {
     return Product(
       id: json['id'] as String? ?? '',
@@ -190,6 +200,9 @@ class Artifact {
     required this.location,
     this.isFeatured = false,
   });
+
+  String getName(bool isArabic) => nameAr;
+  String getDescription(bool isArabic) => descriptionAr;
 
   factory Artifact.fromJson(Map<String, dynamic> json) {
     return Artifact(

@@ -1,13 +1,16 @@
 import 'dart:async';
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+
+import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'dart:ui' as ui;
+import 'package:flutter/services.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/constants/colors.dart';
 import '../../../models/bazaar_model.dart';
 import '../../../repositories/bazaar_repository.dart';
+import '../../shop/screens/bazaar_details_screen.dart';
 
 class InteractiveMapScreen extends StatefulWidget {
   const InteractiveMapScreen({super.key});
@@ -19,7 +22,10 @@ class InteractiveMapScreen extends StatefulWidget {
 class _InteractiveMapScreenState extends State<InteractiveMapScreen>
     with TickerProviderStateMixin {
   final BazaarRepository _bazaarRepository = BazaarRepository();
-  final MapController _mapController = MapController();
+  GoogleMapController? _mapController;
+  BitmapDescriptor? _markerOpen;
+  BitmapDescriptor? _markerClosed;
+  BitmapDescriptor? _markerSelected;
 
   List<Bazaar> _bazaars = [];
   List<Bazaar> _filteredBazaars = [];
@@ -36,16 +42,51 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
   static const double _defaultZoom = 12.0;
 
   @override
+  @override
   void initState() {
     super.initState();
+    _initMarkers();
     _loadBazaars();
     _getCurrentLocation();
   }
 
+  Future<void> _initMarkers() async {
+    _markerOpen = await _createCustomMarkerBitmap(isOpen: true, isSelected: false);
+    _markerClosed = await _createCustomMarkerBitmap(isOpen: false, isSelected: false);
+    _markerSelected = await _createCustomMarkerBitmap(isOpen: true, isSelected: true);
+    if (mounted) setState(() {});
+  }
+
+  Future<BitmapDescriptor> _createCustomMarkerBitmap({required bool isOpen, required bool isSelected}) async {
+    final ui.PictureRecorder pictureRecorder = ui.PictureRecorder();
+    final Canvas canvas = Canvas(pictureRecorder);
+    final size = isSelected ? 80.0 : 60.0;
+    
+    final Paint shadowPaint = Paint()
+      ..color = Colors.black.withOpacity(0.3)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 4.0);
+    canvas.drawCircle(Offset(size/2, size/2 + 2), size/2 - 4, shadowPaint);
+
+    final Paint borderPaint = Paint()
+      ..color = Colors.white
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size/2, size/2), size/2 - 2, borderPaint);
+
+    final Paint fillPaint = Paint()
+      ..color = isSelected ? AppColors.primaryOrange : (isOpen ? AppColors.success : AppColors.textSecondary)
+      ..style = PaintingStyle.fill;
+    canvas.drawCircle(Offset(size/2, size/2), size/2 - 6, fillPaint);
+
+    final img = await pictureRecorder.endRecording().toImage(size.toInt(), size.toInt());
+    final data = await img.toByteData(format: ui.ImageByteFormat.png);
+    return BitmapDescriptor.fromBytes(data!.buffer.asUint8List());
+  }
+
+
   @override
   void dispose() {
     _searchController.dispose();
-    _mapController.dispose();
+    _mapController?.dispose();
     super.dispose();
   }
 
@@ -102,9 +143,11 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
       });
 
       // Center map on user location
-      _mapController.move(
-        LatLng(position.latitude, position.longitude),
-        _defaultZoom,
+      _mapController?.animateCamera(
+        CameraUpdate.newLatLngZoom(
+          LatLng(position.latitude, position.longitude),
+          _defaultZoom,
+        )
       );
 
       _applyFilters(); // Recalculate distances
@@ -143,13 +186,12 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
 
   double _calculateDistance(Bazaar bazaar) {
     if (_userPosition == null) return double.infinity;
-
-    const Distance distance = Distance();
-    return distance.as(
-      LengthUnit.Kilometer,
-      LatLng(_userPosition!.latitude, _userPosition!.longitude),
-      LatLng(bazaar.latitude, bazaar.longitude),
-    );
+    return Geolocator.distanceBetween(
+      _userPosition!.latitude,
+      _userPosition!.longitude,
+      bazaar.latitude,
+      bazaar.longitude,
+    ) / 1000.0;
   }
 
   String _formatDistance(double km) {
@@ -160,13 +202,17 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
   }
 
   Future<void> _openGoogleMapsNavigation(Bazaar bazaar) async {
-    final url = Uri.parse(
-      'https://www.google.com/maps/dir/?api=1&destination=${bazaar.latitude},${bazaar.longitude}&travelmode=driving',
-    );
+    final lat = bazaar.latitude;
+    final lng = bazaar.longitude;
+    final Uri googleMapsUrl = Uri.parse('google.navigation:q=$lat,$lng');
+    final Uri webUrl = Uri.parse('https://www.google.com/maps/search/?api=1&query=$lat,$lng');
 
-    if (await canLaunchUrl(url)) {
-      await launchUrl(url, mode: LaunchMode.externalApplication);
-    } else {
+    try {
+      if (await launchUrl(googleMapsUrl, mode: LaunchMode.externalApplication)) {
+        return;
+      }
+      await launchUrl(webUrl, mode: LaunchMode.externalApplication);
+    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -179,9 +225,11 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
   }
 
   void _centerOnBazaar(Bazaar bazaar) {
-    _mapController.move(
-      LatLng(bazaar.latitude, bazaar.longitude),
-      15.0,
+    _mapController?.animateCamera(
+      CameraUpdate.newLatLngZoom(
+        LatLng(bazaar.latitude, bazaar.longitude),
+        15.5,
+      )
     );
     setState(() => _selectedBazaar = bazaar);
   }
@@ -245,127 +293,48 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
     );
   }
 
-  Widget _buildMap() {
-    return FlutterMap(
-      mapController: _mapController,
-      options: MapOptions(
-        initialCenter: _defaultCenter,
-        initialZoom: _defaultZoom,
-        minZoom: 5,
-        maxZoom: 18,
-        onTap: (_, __) {
-          setState(() => _selectedBazaar = null);
-        },
-      ),
-      children: [
-        // OpenStreetMap Tile Layer
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'com.example.egyptian_tourism_app',
-          maxZoom: 19,
-        ),
+  Set<Marker> _buildMarkers() {
+    return _filteredBazaars.map((bazaar) {
+      final isSelected = _selectedBazaar?.id == bazaar.id;
+      final defaultHue = isSelected 
+          ? BitmapDescriptor.hueOrange 
+          : (bazaar.isOpen ? BitmapDescriptor.hueGreen : BitmapDescriptor.hueRed);
 
-        // User Location Marker
-        if (_userPosition != null)
-          MarkerLayer(
-            markers: [
-              Marker(
-                point: LatLng(
-                  _userPosition!.latitude,
-                  _userPosition!.longitude,
-                ),
-                width: 30,
-                height: 30,
-                child: Container(
-                  decoration: BoxDecoration(
-                    color: AppColors.info,
-                    shape: BoxShape.circle,
-                    border: Border.all(color: AppColors.white, width: 3),
-                    boxShadow: [
-                      BoxShadow(
-                        color: const Color.fromRGBO(33, 150, 243, 0.4),
-                        blurRadius: 10,
-                        spreadRadius: 3,
-                      ),
-                    ],
-                  ),
-                  child: const Icon(
-                    Icons.person,
-                    color: AppColors.white,
-                    size: 16,
-                  ),
-                ),
-              ),
-            ],
-          ),
-
-        // Bazaar Markers
-        MarkerLayer(
-          markers: _filteredBazaars.map((bazaar) {
-            final isSelected = _selectedBazaar?.id == bazaar.id;
-            return Marker(
-              point: LatLng(bazaar.latitude, bazaar.longitude),
-              width: isSelected ? 50 : 44,
-              height: isSelected ? 60 : 54,
-              child: GestureDetector(
-                onTap: () => _centerOnBazaar(bazaar),
-                child: _buildBazaarMarker(bazaar, isSelected),
-              ),
-            );
-          }).toList(),
-        ),
-      ],
-    );
+      return Marker(
+        markerId: MarkerId(bazaar.id),
+        position: LatLng(bazaar.latitude, bazaar.longitude),
+        icon: isSelected 
+             ? (_markerSelected ?? BitmapDescriptor.defaultMarkerWithHue(defaultHue)) 
+             : (bazaar.isOpen 
+                 ? (_markerOpen ?? BitmapDescriptor.defaultMarkerWithHue(defaultHue)) 
+                 : (_markerClosed ?? BitmapDescriptor.defaultMarkerWithHue(defaultHue))),
+        onTap: () => _centerOnBazaar(bazaar),
+        zIndex: isSelected ? 2.0 : 1.0,
+      );
+    }).toSet();
   }
 
-  Widget _buildBazaarMarker(Bazaar bazaar, bool isSelected) {
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primaryOrange
-                : (bazaar.isOpen ? AppColors.success : AppColors.textSecondary),
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.white,
-              width: isSelected ? 3 : 2,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: (isSelected
-                        ? AppColors.primaryOrange
-                        : (bazaar.isOpen
-                            ? AppColors.success
-                            : AppColors.textSecondary))
-                    .withOpacity(0.4),
-                blurRadius: isSelected ? 12 : 8,
-                spreadRadius: isSelected ? 2 : 1,
-              ),
-            ],
-          ),
-          child: Icon(
-            Icons.store_rounded,
-            color: AppColors.white,
-            size: isSelected ? 22 : 18,
-          ),
-        ),
-        Container(
-          width: 12,
-          height: 12,
-          decoration: BoxDecoration(
-            color: isSelected
-                ? AppColors.primaryOrange
-                : (bazaar.isOpen ? AppColors.success : AppColors.textSecondary),
-            borderRadius: const BorderRadius.only(
-              bottomLeft: Radius.circular(12),
-              bottomRight: Radius.circular(12),
-            ),
-          ),
-        ),
-      ],
+  Widget _buildMap() {
+    return GoogleMap(
+      initialCameraPosition: const CameraPosition(
+        target: _defaultCenter,
+        zoom: _defaultZoom,
+      ),
+      onMapCreated: (controller) {
+        _mapController = controller;
+        // Optionally set a custom map style here
+        // _mapController?.setMapStyle(_mapStyleString);
+      },
+      onTap: (_) {
+        setState(() => _selectedBazaar = null);
+      },
+      markers: _buildMarkers(),
+      myLocationEnabled: _userPosition != null, // Shows blue dot for user
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      buildingsEnabled: true,
+      compassEnabled: false,
     );
   }
 
@@ -384,7 +353,7 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
       ),
       child: TextField(
         controller: _searchController,
-        textDirection: TextDirection.rtl,
+        
         decoration: InputDecoration(
           hintText: 'ابحث عن بازار...',
           hintStyle: const TextStyle(
@@ -496,24 +465,18 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
         // Zoom In
         _buildControlButton(
           icon: Icons.add,
-          onTap: () {
-            final currentZoom = _mapController.camera.zoom;
-            _mapController.move(
-              _mapController.camera.center,
-              math.min(currentZoom + 1, 18),
-            );
+          onTap: () async {
+            final currentZoom = await _mapController?.getZoomLevel() ?? _defaultZoom;
+            _mapController?.animateCamera(CameraUpdate.zoomTo(math.min(currentZoom + 1.0, 20.0)));
           },
         ),
         const SizedBox(height: 8),
         // Zoom Out
         _buildControlButton(
           icon: Icons.remove,
-          onTap: () {
-            final currentZoom = _mapController.camera.zoom;
-            _mapController.move(
-              _mapController.camera.center,
-              math.max(currentZoom - 1, 5),
-            );
+          onTap: () async {
+            final currentZoom = await _mapController?.getZoomLevel() ?? _defaultZoom;
+            _mapController?.animateCamera(CameraUpdate.zoomTo(math.max(currentZoom - 1.0, 2.0)));
           },
         ),
         const SizedBox(height: 16),
@@ -597,7 +560,7 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
               const Spacer(),
               // Name and status
               Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
                     bazaar.nameAr,
@@ -740,11 +703,10 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
               Expanded(
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    // TODO: Navigate to bazaar products
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('تصفح منتجات ${bazaar.nameAr}'),
-                        backgroundColor: AppColors.primaryOrange,
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => BazaarDetailsScreen(bazaarId: bazaar.id),
                       ),
                     );
                   },
@@ -775,11 +737,14 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
     return Row(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Text(
-          label,
-          style: const TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
+        Flexible(
+          child: Text(
+            label,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppColors.textSecondary,
+            ),
+            overflow: TextOverflow.ellipsis,
           ),
         ),
         const SizedBox(width: 4),
@@ -974,7 +939,7 @@ class _InteractiveMapScreenState extends State<InteractiveMapScreen>
             const Spacer(),
             // Name and Details
             Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
                   bazaar.nameAr,

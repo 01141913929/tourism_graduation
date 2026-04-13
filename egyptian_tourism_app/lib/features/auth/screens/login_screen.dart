@@ -376,7 +376,7 @@ class _LoginScreenState extends State<LoginScreen>
           ),
           // Content
           Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // Museum icon
               Container(

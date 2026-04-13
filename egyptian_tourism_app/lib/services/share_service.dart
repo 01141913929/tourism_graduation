@@ -77,4 +77,21 @@ $link
     final text = generateBazaarShareText(bazaar);
     await Clipboard.setData(ClipboardData(text: text));
   }
+
+  /// Share app with friends
+  static Future<void> shareApp() async {
+    const appShareText = '''
+🛍️ تطبيق سوق مصر - متجر التحف المصرية
+
+اكتشف روائع الحضارة الفرعونية واقتني قطعاً فريدة من تاريخ مصر العريق!
+
+✨ تحف أصيلة وهدايا تذكارية
+🏪 بازارات موثقة في جميع المحافظات
+💰 أسعار تنافسية مع خصومات حصرية
+
+حمّل التطبيق الآن:
+https://egyptiantourism.app/download
+''';
+    await Clipboard.setData(const ClipboardData(text: appShareText));
+  }
 }
