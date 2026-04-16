@@ -3,7 +3,10 @@
 يلخّص المحادثة بعد 15 رسالة عشان context window ما يتملاش
 """
 import asyncio
+import logging
 from services.gemini_service import get_llm
+
+logger = logging.getLogger(__name__)
 
 
 SUMMARIZE_PROMPT = """لخّص هذه المحادثة في 3-4 سطور بالعربية.
@@ -47,7 +50,7 @@ async def summarize_conversation(messages) -> str:
         result = await asyncio.wait_for(llm.ainvoke(prompt), timeout=15.0)
         return result.content.strip()
     except Exception as e:
-        print(f"⚠️ Summarization error: {e}")
+        logger.warning(f"Summarization error: {e}")
         return ""
 
 

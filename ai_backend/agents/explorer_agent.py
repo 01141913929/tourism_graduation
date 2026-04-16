@@ -1,8 +1,9 @@
 """
 🏛️ Explorer Agent — وكيل الاستكشاف الموحد
 يجمع بين البحث في التاريخ والآثار (History) والإرشاد السياحي للأماكن (Tour Guide)
-✅ يستخدم RAG + Tool Calling للبحث المجمّع السريع
+يستخدم RAG + Tool Calling للبحث المجمّع السريع
 """
+import logging
 import asyncio
 from graph.state import AgentState
 
@@ -14,6 +15,8 @@ from rag.engine import search_knowledge
 
 # دمج أدوات الآثار وأماكن البازارات
 EXPLORER_TOOLS = ARTIFACT_TOOLS + BAZAAR_TOOLS
+
+logger = logging.getLogger(__name__)
 
 async def run_explorer_agent(state: AgentState) -> dict:
     messages = state.get("messages", [])
@@ -31,7 +34,7 @@ async def run_explorer_agent(state: AgentState) -> dict:
         if rag_context:
             extra_parts.append(f"\n\n--- قاعدة المعرفة (تاريخ وسياحة) ---\n{rag_context}")
     except Exception as e:
-        print(f"⚠️ Explorer RAG timeout or error: {e}")
+        logger.warning(f"Explorer RAG timeout or error: {e}")
 
     # سياق الذاكرة
     memory_ctx = state.get("memory_context", "")
@@ -59,7 +62,7 @@ async def run_explorer_agent(state: AgentState) -> dict:
             agent_name="explorer_agent",
         )
     except Exception as e:
-        print(f"❌ Explorer agent error: {e}")
+        logger.error(f"Explorer agent error: {e}")
         response = "عذراً، حدث خطأ أثناء البحث عن المعلومات التاريخية والسياحية."
 
     return {

@@ -5,17 +5,22 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:web_socket_channel/web_socket_channel.dart';
+import 'package:web_socket_channel/status.dart' as status;
 import '../models/ai_chat_models.dart';
 
 class AiChatService {
   // === الإعدادات ===
-  static const String _fallbackUrl = 'https://oozy-laboringly-taliyah.ngrok-free.dev';
+  static const String _fallbackHttpUrl = 'https://4071i39q50.execute-api.us-east-1.amazonaws.com/deployment-test';
+  static const String _wsUrl = 'wss://zm6it1qy02.execute-api.us-east-1.amazonaws.com/deployment-test';
   static const String _prefKey = 'ai_server_url';
 
   String _baseUrl;
   final String sessionId;
   final String? userId;
   final http.Client _client;
+  WebSocketChannel? _channel;
+  Timer? _pingTimer;
 
   AiChatService._({
     required String baseUrl,
@@ -40,9 +45,8 @@ class AiChatService {
     );
   }
 
-  /// إنشاء سريع بدون async (يستخدم الرابط الافتراضي)
   factory AiChatService({
-    String baseUrl = _fallbackUrl,
+    String baseUrl = _fallbackHttpUrl,
     String? sessionId,
     String? userId,
   }) {
@@ -54,14 +58,8 @@ class AiChatService {
     );
   }
 
-  /// الرابط الحالي
   String get baseUrl => _baseUrl;
 
-  /// ========================================
-  /// 💾 حفظ وتحميل رابط السيرفر
-  /// ========================================
-
-  /// حفظ رابط جديد
   static Future<void> saveUrl(String url) async {
     final prefs = await SharedPreferences.getInstance();
     String cleaned = url.trim();
@@ -71,12 +69,11 @@ class AiChatService {
     await prefs.setString(_prefKey, cleaned);
   }
 
-  /// تحميل الرابط المحفوظ
   static Future<String> getSavedUrl() async {
-    return _fallbackUrl;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString(_prefKey) ?? _fallbackHttpUrl;
   }
 
-  /// تحديث الرابط في الـ instance الحالي
   Future<void> updateUrl(String url) async {
     await saveUrl(url);
     _baseUrl = url.trim();
@@ -86,87 +83,103 @@ class AiChatService {
   }
 
   /// ========================================
-  /// 📡 إرسال رسالة بالبث المباشر (SSE)
+  /// 📡 إرسال رسالة بالبث المباشر (WebSockets)
   /// ========================================
   Stream<AiStreamEvent> sendMessageStream(String message) async* {
-    final url = Uri.parse('$_baseUrl/api/chat/stream');
-    final body = jsonEncode({
-      'message': message,
-      'session_id': sessionId,
-      'user_id': userId ?? '',
-    });
+    if (_channel != null) {
+      _channel!.sink.close(status.normalClosure);
+    }
 
     try {
-      final request = http.Request('POST', url);
-      request.headers['Content-Type'] = 'application/json';
-      request.body = body;
+      // Derive WS URL from base URL or use the hardcoded fallback
+      final wsEndpoint = _deriveWsUrl();
+      _channel = WebSocketChannel.connect(Uri.parse(wsEndpoint));
+      
+      final payload = jsonEncode({
+        'action': 'sendMessage',
+        'message': message,
+        'session_id': sessionId,
+        'user_id': userId ?? '',
+      });
+      _channel!.sink.add(payload);
+      
+      _startPingTimer();
 
-      final response = await _client.send(request).timeout(
-            const Duration(seconds: 30),
-          );
+      await for (final dynamic message in _channel!.stream) {
+        String dataStr = message.toString();
+        try {
+          final data = jsonDecode(dataStr) as Map<String, dynamic>;
+          final type = data['type'] as String? ?? '';
 
-      if (response.statusCode != 200) {
-        yield AiStreamEvent.error('خطأ في السيرفر: ${response.statusCode}');
-        return;
-      }
+          switch (type) {
+            case 'status':
+              yield AiStreamEvent.status(
+                agent: data['agent'] as String? ?? '',
+                status: data['status'] as String? ?? '',
+              );
+              break;
 
-      String buffer = '';
-      await for (final chunk in response.stream
-          .transform(utf8.decoder)
-          .timeout(const Duration(seconds: 45))) {
-        buffer += chunk;
+            case 'chunk':
+              yield AiStreamEvent.chunk(
+                content: data['content'] as String? ?? '',
+              );
+              break;
 
-        while (buffer.contains('\n\n')) {
-          final index = buffer.indexOf('\n\n');
-          final line = buffer.substring(0, index).trim();
-          buffer = buffer.substring(index + 2);
+            case 'done':
+              yield AiStreamEvent.done(
+                agent: data['agent'] as String? ?? '',
+                sentiment: data['sentiment'] as String? ?? 'neutral',
+                quickActions: (data['quick_actions'] as List<dynamic>?)
+                        ?.map((qa) => AiQuickAction.fromJson(
+                            qa as Map<String, dynamic>))
+                        .toList() ??
+                    [],
+                cached: data['cached'] as bool? ?? false,
+              );
+              // ✅ إغلاق الاتصال والخروج — عشان الـ stream يخلص
+              _channel?.sink.close(status.normalClosure);
+              _channel = null;
+              return;
 
-          if (line.startsWith('data: ')) {
-            final jsonStr = line.substring(6);
-            try {
-              final data = jsonDecode(jsonStr) as Map<String, dynamic>;
-              final type = data['type'] as String? ?? '';
-
-              switch (type) {
-                case 'status':
-                  yield AiStreamEvent.status(
-                    agent: data['agent'] as String? ?? '',
-                    status: data['status'] as String? ?? '',
-                  );
-                  break;
-
-                case 'chunk':
-                  yield AiStreamEvent.chunk(
-                    content: data['content'] as String? ?? '',
-                  );
-                  break;
-
-                case 'done':
-                  yield AiStreamEvent.done(
-                    agent: data['agent'] as String? ?? '',
-                    sentiment: data['sentiment'] as String? ?? 'neutral',
-                    quickActions: (data['quick_actions'] as List<dynamic>?)
-                            ?.map((qa) => AiQuickAction.fromJson(
-                                qa as Map<String, dynamic>))
-                            .toList() ??
-                        [],
-                    cached: data['cached'] as bool? ?? false,
-                  );
-                  break;
-              }
-            } catch (_) {
-              // تجاهل JSON غير صالح
-            }
+            case 'error':
+              yield AiStreamEvent.error(data['message'] as String? ?? 'حدث خطأ غير معروف في السيرفر');
+              _channel?.sink.close(status.normalClosure);
+              _channel = null;
+              return;
           }
+        } catch (_) {
+          // تجاهل JSON غير صالح
         }
       }
-    } on TimeoutException {
-      yield AiStreamEvent.error('انتهى وقت الانتظار. تأكد من تشغيل السيرفر.');
     } catch (e) {
       yield AiStreamEvent.error(
           'خطأ في الاتصال: ${e.toString().length > 80 ? e.toString().substring(0, 80) : e}');
+    } finally {
+      _stopPingTimer();
+      _channel?.sink.close(status.normalClosure);
+      _channel = null;
     }
   }
+
+  /// Start a ping timer to keep AWS API Gateway WebSocket connection alive
+  void _startPingTimer() {
+    _pingTimer?.cancel();
+    _pingTimer = Timer.periodic(const Duration(seconds: 45), (timer) {
+      if (_channel != null) {
+        try {
+          _channel!.sink.add(jsonEncode({'action': 'ping'}));
+        } catch (_) {}
+      } else {
+        timer.cancel();
+      }
+    });
+  }
+
+  /// Stop ping timer
+  void _stopPingTimer() {
+    _pingTimer?.cancel();
+  }
+
 
   /// ========================================
   /// 💬 إرسال رسالة عادية (REST — بديل)
@@ -227,8 +240,21 @@ class AiChatService {
     }
   }
 
+  /// Derive WebSocket URL from the HTTP base URL
+  String _deriveWsUrl() {
+    // If base URL matches known HTTP endpoint, use matching WS endpoint
+    if (_baseUrl == _fallbackHttpUrl) return _wsUrl;
+    // Convert http(s):// to ws(s)://
+    final wsUrl = _baseUrl
+        .replaceFirst('https://', 'wss://')
+        .replaceFirst('http://', 'ws://');
+    return wsUrl;
+  }
+
   void dispose() {
+    _stopPingTimer();
     _client.close();
+    _channel?.sink.close(status.normalClosure);
   }
 }
 

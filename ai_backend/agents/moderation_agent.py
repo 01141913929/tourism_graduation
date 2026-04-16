@@ -150,7 +150,7 @@ async def moderate_product(product_id: str) -> dict:
     category = product.get("category", "أخرى")
     market = await get_market_prices(category)
 
-    llm = get_llm(temperature=0.3)
+    llm = get_llm(temperature=0.3, app_id="admin")
     prompt = MODERATE_PRODUCT_PROMPT.format(
         name_ar=product.get("nameAr", ""),
         name_en=product.get("nameEn", ""),
@@ -198,7 +198,7 @@ async def analyze_application(application_id: str) -> dict:
         }
 
     # data is already a dict from AWS — no need for doc.to_dict()
-    llm = get_llm(temperature=0.3)
+    llm = get_llm(temperature=0.3, app_id="admin")
     prompt = ANALYZE_APPLICATION_PROMPT.format(
         bazaar_name=data.get("nameAr", data.get("name_ar", "")),
         description=data.get("descriptionAr", data.get("description_ar", "")),

@@ -78,6 +78,24 @@ async def search_products(query: str = None, category: str = None,
     return result or []
 
 
+async def search_products_vector(query_embedding: list[float], limit: int = 5) -> list[dict]:
+    """Semantic search for products using pgvector cosine distance."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('''
+                SELECT id, name_ar AS "nameAr", name_en AS "nameEn", 
+                       description_ar AS "descriptionAr", category_name AS category, 
+                       price, image_url AS "imageUrl", bazaar_name AS "bazaarName",
+                       (embedding <=> %s::vector) as distance
+                FROM products
+                ORDER BY distance ASC
+                LIMIT %s
+            ''', (query_embedding, limit))
+            return [dict(r) for r in cur.fetchall()]
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
 async def get_product_by_id(product_id: str) -> dict | None:
     def _query(conn):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -109,7 +127,7 @@ async def get_featured_products(limit: int = 5) -> list[dict]:
 async def get_all_products() -> list[dict]:
     def _query(conn):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
-            cur.execute('SELECT id, name_ar AS "nameAr", category_name AS category, price, old_price AS "oldPrice", rating, review_count AS "reviewCount", is_active AS "isActive", is_featured AS "isFeatured" FROM products')
+            cur.execute('SELECT id, name_ar AS "nameAr", name_en AS "nameEn", description_ar AS "descriptionAr", category_name AS category, price, old_price AS "oldPrice", rating, review_count AS "reviewCount", image_url AS "imageUrl", bazaar_name AS "bazaarName", bazaar_id AS "bazaarId", is_active AS "isActive", is_featured AS "isFeatured" FROM products')
             return [dict(r) for r in cur.fetchall()]
 
     result = await asyncio.to_thread(_execute_aurora_query, _query)
@@ -197,6 +215,22 @@ async def get_nearby_bazaars(lat: float, lng: float, radius_km: float = 50) -> l
     return result or []
 
 
+async def search_bazaars_vector(query_embedding: list[float], limit: int = 3) -> list[dict]:
+    """Semantic search for bazaars using pgvector cosine distance."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute('''
+                SELECT id, name_ar AS "nameAr", description_ar AS "descriptionAr", 
+                       address, is_open AS "isOpen", (embedding <=> %s::vector) as distance
+                FROM bazaars
+                ORDER BY distance ASC
+                LIMIT %s
+            ''', (query_embedding, limit))
+            return [dict(r) for r in cur.fetchall()]
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
 async def get_bazaar_application(bazaar_id: str) -> dict | None:
     def _query(conn):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -261,6 +295,134 @@ async def get_bazaar_reviews(bazaar_id: str) -> list[dict]:
     return result or []
 
 
+# ============================================================
+# Professional Analytics (Optimized SQL Aggregations)
+# ============================================================
+
+async def get_platform_metrics_sql(days: int = 30) -> dict:
+    """Get core platform metrics directly via SQL SUM/COUNT."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            
+            # 1. Revenue & Orders & Customers
+            cur.execute("""
+                SELECT 
+                    COUNT(id) as total_orders,
+                    COALESCE(SUM(total_amount), 0) as total_revenue,
+                    COUNT(DISTINCT bazaar_id) as total_active_bazaars_in_orders,
+                    COUNT(DISTINCT user_id) as total_customers,
+                    COUNT(id) FILTER (WHERE status = 'delivered') as delivered_orders,
+                    COUNT(id) FILTER (WHERE status = 'cancelled') as cancelled_orders
+                FROM orders 
+                WHERE created_at >= %s
+            """, (cutoff,))
+            order_metrics = dict(cur.fetchone())
+
+            # 2. Total Bazaars & Products
+            cur.execute("SELECT COUNT(*) as total_bazaars, COUNT(*) FILTER (WHERE is_approved=true) as approved_bazaars FROM bazaars")
+            b_counts = cur.fetchone()
+            bazaar_count = b_counts["total_bazaars"]
+            approved_bazaars = b_counts["approved_bazaars"]
+
+            cur.execute("SELECT COUNT(*) as total_products FROM products WHERE is_active = true")
+            product_count = cur.fetchone()["total_products"]
+
+            return {
+                **order_metrics,
+                "total_bazaars": bazaar_count,
+                "active_bazaars": approved_bazaars, # The UI uses this for the 13/13 indicator
+                "total_products": product_count,
+                "cancellation_rate": round((order_metrics["cancelled_orders"] / order_metrics["total_orders"] * 100) if order_metrics["total_orders"] > 0 else 0, 1)
+            }
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
+async def get_revenue_trend_sql(days: int = 30) -> list[dict]:
+    """Get daily revenue data for time-series charts."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    TO_CHAR(DATE_TRUNC('day', created_at), 'YYYY-MM-DD') as date,
+                    SUM(total_amount)::FLOAT as revenue
+                FROM orders
+                WHERE created_at >= NOW() - %s * INTERVAL '1 day'
+                GROUP BY 1
+                ORDER BY 1 ASC
+            """, (days,))
+            return [dict(r) for r in cur.fetchall()]
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
+async def get_bazaar_rankings_sql(days: int = 30, limit: int = 10) -> list[dict]:
+    """Rank bazaars by revenue using SQL GROUP BY."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cutoff = datetime.utcnow() - timedelta(days=days)
+            cur.execute("""
+                SELECT 
+                    b.id, 
+                    COALESCE(b.name_ar, b.name_en, 'بازار بدون اسم') as name, 
+                    SUM(o.total_amount)::FLOAT as revenue,
+                    COUNT(o.id)::INTEGER as order_count
+                FROM bazaars b
+                JOIN orders o ON b.id = o.bazaar_id
+                WHERE o.created_at >= %s AND o.status IN ('delivered', 'accepted', 'preparing')
+                GROUP BY b.id, b.name_ar, b.name_en
+                ORDER BY revenue DESC
+                LIMIT %s
+            """, (cutoff, limit))
+            rows = cur.fetchall()
+            return [dict(r) for r in rows]
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
+async def get_category_distribution_sql() -> list[dict]:
+    """Get product distribution by category."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT category_name as category, COUNT(*) as count 
+                FROM products 
+                GROUP BY category_name 
+                ORDER BY count DESC
+            """)
+            return [dict(r) for r in cur.fetchall()]
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
+async def get_system_health_metrics_sql() -> dict:
+    """Professional health check: scans for missing data/images."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    COUNT(*) as total,
+                    COUNT(*) FILTER (WHERE image_url IS NULL OR image_url = '') as no_image,
+                    COUNT(*) FILTER (WHERE description_ar IS NULL OR description_ar = '') as no_desc
+                FROM products
+            """)
+            p_health = dict(cur.fetchone())
+            
+            cur.execute("SELECT COUNT(*) as pending FROM bazaar_applications WHERE status = 'PENDING'")
+            pending_apps = cur.fetchone()["pending"]
+
+            return {
+                "products_total": p_health["total"],
+                "missing_images": p_health["no_image"],
+                "missing_descriptions": p_health["no_desc"],
+                "pending_applications": pending_apps,
+                "health_score": max(0, 100 - (p_health["no_image"] * 2) - (pending_apps * 5))
+            }
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
 async def get_bazaar_messages(bazaar_id: str, limit: int) -> list[dict]:
     def _query(conn):
         with conn.cursor(cursor_factory=RealDictCursor) as cur:
@@ -272,23 +434,28 @@ async def get_bazaar_messages(bazaar_id: str, limit: int) -> list[dict]:
 
 
 # ============================================================
-# Cart Queries (DynamoDB)
+# Cart Queries (Firestore)
 # ============================================================
+
+from core.firebase_config import get_firestore_client
+from google.cloud.firestore_v1.base_query import FieldFilter
 
 async def get_cart_items(user_id: str) -> list[dict]:
     if not user_id or user_id == "default":
         return []
 
     def _query():
-        table = get_dynamo_table("AiCarts")
-        res = table.get_item(Key={"UserId": user_id})
-        item = res.get("Item", {})
-        items_str = item.get("Items", "[]")
-        return json.loads(items_str)
+        db = get_firestore_client()
+        if not db:
+            return []
+        items_ref = db.collection("carts").document(user_id).collection("items")
+        docs = items_ref.stream()
+        return [doc.to_dict() for doc in docs]
 
     try:
         return await asyncio.to_thread(_query)
-    except Exception:
+    except Exception as e:
+        logger.error(f"Firestore Cart Get Error: {e}")
         return []
 
 
@@ -297,59 +464,59 @@ async def add_cart_item(user_id: str, item: dict):
         return
 
     def _query():
-        table = get_dynamo_table("AiCarts")
-        # Get current items synchronously
-        res = table.get_item(Key={"UserId": user_id})
-        existing = res.get("Item", {})
-        items_str = existing.get("Items", "[]")
-        items = json.loads(items_str)
+        db = get_firestore_client()
+        if not db:
+            return
+            
+        doc_id = item.get("id")
+        if not doc_id:
+            doc_id = f"{item.get('productId')}_{item.get('selectedSize', '')}".strip("_")
+            item["id"] = doc_id
 
-        # Check if exists
-        doc_id = f"{item['productId']}_{item.get('selectedSize', '')}"
-        found = False
-        for it in items:
-            it_id = f"{it['productId']}_{it.get('selectedSize', '')}"
-            if it_id == doc_id:
-                it["quantity"] = it.get("quantity", 1) + item.get("quantity", 1)
-                found = True
-                break
-        if not found:
-            items.append(item)
-
-        table.put_item(Item={"UserId": user_id, "Items": json.dumps(items)})
+        doc_ref = db.collection("carts").document(user_id).collection("items").document(doc_id)
+        doc = doc_ref.get()
+        
+        if doc.exists:
+            existing_data = doc.to_dict()
+            new_qty = existing_data.get("quantity", 1) + item.get("quantity", 1)
+            doc_ref.update({"quantity": new_qty})
+        else:
+            doc_ref.set(item)
 
     try:
         await asyncio.to_thread(_query)
     except Exception as e:
-        logger.error(f"Dynamo Cart Add Error: {e}")
+        logger.error(f"Firestore Cart Add Error: {e}")
 
 
-async def remove_cart_item(user_id: str, item_index: int):
+async def remove_cart_item(user_id: str, item_id: str):
     def _query():
-        table = get_dynamo_table("AiCarts")
-        res = table.get_item(Key={"UserId": user_id})
-        existing = res.get("Item", {})
-        items_str = existing.get("Items", "[]")
-        items = json.loads(items_str)
-        if 0 <= item_index < len(items):
-            items.pop(item_index)
-            table.put_item(Item={"UserId": user_id, "Items": json.dumps(items)})
+        db = get_firestore_client()
+        if not db:
+            return
+        doc_ref = db.collection("carts").document(user_id).collection("items").document(item_id)
+        doc_ref.delete()
 
     try:
         await asyncio.to_thread(_query)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Firestore Cart Remove Error: {e}")
 
 
 async def clear_cart(user_id: str):
     def _query():
-        table = get_dynamo_table("AiCarts")
-        table.delete_item(Key={"UserId": user_id})
+        db = get_firestore_client()
+        if not db:
+            return
+        items_ref = db.collection("carts").document(user_id).collection("items")
+        docs = items_ref.stream()
+        for doc in docs:
+            doc.reference.delete()
 
     try:
         await asyncio.to_thread(_query)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.error(f"Firestore Cart Clear Error: {e}")
 
 
 # ============================================================
@@ -418,6 +585,45 @@ async def get_conversation_summaries(user_id: str, limit: int = 5) -> list[str]:
         return await asyncio.to_thread(_query)
     except Exception:
         return []
+
+
+# ============================================================
+# Vector Knowledge Base (RAG)
+# ============================================================
+
+async def search_knowledge_base(query_embedding: list[float], limit: int = 3) -> list[dict]:
+    """Semantic search in agent knowledge base using pgvector."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            # We use cosine distance <=> operator in pgvector
+            cur.execute("""
+                SELECT text_content, metadata, (embedding <=> %s::vector) as distance
+                FROM agent_knowledge_base
+                ORDER BY distance ASC
+                LIMIT %s
+            """, (query_embedding, limit))
+            return [dict(r) for r in cur.fetchall()]
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
+
+
+async def get_market_prices_sql(category: str) -> dict:
+    """Get market price statistics for a category directly via SQL."""
+    def _query(conn):
+        with conn.cursor(cursor_factory=RealDictCursor) as cur:
+            cur.execute("""
+                SELECT 
+                    AVG(price)::FLOAT as average, 
+                    MIN(price)::FLOAT as min, 
+                    MAX(price)::FLOAT as max, 
+                    COUNT(*)::INTEGER as count,
+                    PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY price)::FLOAT as median
+                FROM products 
+                WHERE category_name = %s AND price > 0
+            """, (category,))
+            return dict(cur.fetchone())
+
+    return await asyncio.to_thread(_execute_aurora_query, _query)
 
 
 async def get_user_memory(user_id: str) -> dict:

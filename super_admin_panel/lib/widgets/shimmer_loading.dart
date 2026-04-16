@@ -190,9 +190,9 @@ class ShimmerProductCard extends StatelessWidget {
             // Image
             Container(
               height: 160,
-              decoration: BoxDecoration(
+              decoration: const BoxDecoration(
                 color: AppColors.divider,
-                borderRadius: const BorderRadius.vertical(
+                borderRadius: BorderRadius.vertical(
                   top: Radius.circular(16),
                 ),
               ),

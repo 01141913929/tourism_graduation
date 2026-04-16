@@ -5,6 +5,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/models.dart';
 import '../repositories/product_repository.dart';
 
@@ -70,7 +71,7 @@ class RecommendationResult {
 
 /// 🎯 خدمة الاقتراحات الذكية
 class RecommendationService {
-  static const String _fallbackUrl = 'https://oozy-laboringly-taliyah.ngrok-free.dev';
+  static const String _fallbackUrl = 'https://4071i39q50.execute-api.us-east-1.amazonaws.com/deployment-test';
   static const Duration _timeout = Duration(seconds: 30);
   static const Duration _quickTimeout = Duration(seconds: 10);
 
@@ -89,7 +90,8 @@ class RecommendationService {
 
   /// 🌐 الحصول على الرابط المحفوظ
   Future<String> _getBaseUrl() async {
-    return _fallbackUrl;
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getString('ai_server_url') ?? _fallbackUrl;
   }
 
   /// ============================================================

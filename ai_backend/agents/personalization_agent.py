@@ -2,10 +2,13 @@
 ✨ Personalization Agent — وكيل التخصيص
 الوكيل الأذكى — بيحلل مشاعر المستخدم وبيقترح حاجات بدون ما يتسأل
 """
+import logging
 from graph.state import AgentState
 from services.gemini_service import get_llm, get_fast_llm
 from langchain_core.messages import AIMessage, SystemMessage
 from memory.semantic_memory import get_preferences_context
+
+logger = logging.getLogger(__name__)
 
 
 PERSONALIZATION_PROMPT = """أنت وكيل التخصيص الذكي في نظام السياحة المصرية. ✨
@@ -82,26 +85,6 @@ async def run_personalization_agent(state: AgentState) -> dict:
         "messages": [AIMessage(content=response.content, name="personalization_agent")],
     }
 
-
-async def _analyze_sentiment(llm, message: str) -> str:
-    """تحليل مزاج المستخدم من الرسالة."""
-    if not message:
-        return "neutral"
-
-    prompt = f"""حلل مزاج المستخدم من هذه الرسالة.
-أجب بكلمة واحدة فقط: positive / neutral / negative / curious / excited / confused
-
-الرسالة: "{message}"
-
-المزاج:"""
-
-    try:
-        response = await llm.ainvoke(prompt)
-        sentiment = response.content.strip().lower()
-        valid = ["positive", "neutral", "negative", "curious", "excited", "confused"]
-        return sentiment if sentiment in valid else "neutral"
-    except Exception:
-        return "neutral"
 
 
 async def _generate_suggestions(llm, message: str, prefs_ctx: str,

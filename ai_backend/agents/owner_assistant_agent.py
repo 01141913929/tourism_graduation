@@ -200,7 +200,7 @@ async def generate_product_description(
     market_context: str = "",
 ) -> dict:
     """توليد وصف منتج احترافي."""
-    llm = get_llm(temperature=0.7)
+    llm = get_llm(temperature=0.7, app_id="owner")
     prompt = PRODUCT_DESCRIPTION_PROMPT.format(
         product_name=product_name,
         category=category or "غير محدد",
@@ -254,7 +254,7 @@ async def suggest_replies(
     context: str = "",
 ) -> dict:
     """اقتراح ردود ذكية على رسائل العملاء."""
-    llm = get_llm(temperature=0.7)
+    llm = get_llm(temperature=0.7, app_id="owner")
     prompt = REPLY_SUGGESTIONS_PROMPT.format(
         customer_message=customer_message,
         customer_name=customer_name or "العميل",
@@ -282,7 +282,7 @@ async def generate_content(
     language: str = "ar",
 ) -> dict:
     """توليد محتوى تسويقي."""
-    llm = get_llm(temperature=0.8)
+    llm = get_llm(temperature=0.8, app_id="owner")
     prompt = CONTENT_GENERATION_PROMPT.format(
         content_type=content_type,
         product_name=product_name or "منتج",
@@ -303,7 +303,7 @@ async def generate_content(
 
 async def generate_daily_digest(analytics_data: dict) -> dict:
     """توليد ملخص يومي ذكي."""
-    llm = get_llm(temperature=0.6)
+    llm = get_llm(temperature=0.6, app_id="owner")
     prompt = DAILY_DIGEST_PROMPT.format(
         analytics_data=json.dumps(analytics_data, ensure_ascii=False, default=str),
         today=datetime.now().strftime("%Y-%m-%d %A"),
@@ -326,7 +326,7 @@ async def suggest_products(
     sales_data: str = "",
 ) -> dict:
     """اقتراح منتجات جديدة."""
-    llm = get_llm(temperature=0.7)
+    llm = get_llm(temperature=0.7, app_id="owner")
     prompt = PRODUCT_SUGGESTIONS_PROMPT.format(
         current_products=current_products,
         market_data=market_data or "لا تتوفر بيانات",

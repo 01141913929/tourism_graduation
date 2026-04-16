@@ -1,11 +1,14 @@
 """
 🧬 Semantic Memory — الذاكرة الدلالية (طويلة المدى)
 بتتعلم تفضيلات المستخدم وبتحدّثها مع كل محادثة.
-مخزنة في Firestore وبتستمر بين الجلسات.
+مخزنة في AWS DynamoDB وبتستمر بين الجلسات.
 """
+import logging
 from services.gemini_service import get_llm
 from memory.aws_memory import get_user_preferences, save_user_preferences
 from models.memory import UserPreferences
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -78,7 +81,6 @@ ERAS: عصر1, عصر2 (أو SAME)"""
             if line.startswith("CATEGORIES:") and "SAME" not in line:
                 cats = [c.strip() for c in line.replace("CATEGORIES:", "").split(",") if c.strip()]
                 if cats:
-                    # دمج مع الحالي بدون تكرار
                     for cat in cats:
                         if cat not in current_prefs.favorite_categories:
                             current_prefs.favorite_categories.append(cat)
@@ -103,7 +105,7 @@ ERAS: عصر1, عصر2 (أو SAME)"""
                             current_prefs.favorite_eras.append(era)
 
     except Exception as e:
-        print(f"⚠️ خطأ في تعلم التفضيلات: {e}")
+        logger.warning(f"خطأ في تعلم التفضيلات: {e}")
 
     return current_prefs
 

@@ -1,8 +1,7 @@
 from agents.supervisor import run_supervisor
-from agents.product_agent import run_product_agent
-from agents.history_agent import run_history_agent
-from agents.cart_agent import run_cart_agent
-from agents.tour_guide_agent import run_tour_guide_agent
-from agents.web_research_agent import run_web_research_agent
+from agents.commerce_agent import run_commerce_agent
+from agents.explorer_agent import run_explorer_agent
+from agents.assistant_agent import run_assistant_agent
 from agents.personalization_agent import run_personalization_agent
-from agents.general_agent import run_general_agent
+from agents.moderation_agent import moderate_product, analyze_application
+from agents.admin_assistant_agent import admin_chat

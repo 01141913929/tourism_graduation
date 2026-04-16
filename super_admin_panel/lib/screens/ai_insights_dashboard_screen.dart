@@ -462,10 +462,10 @@ class _AIInsightsDashboardScreenState extends State<AIInsightsDashboardScreen>
               ],
             ),
           ),
-          // Quick stats
+          // Quick stats — resilient to both flattened and nested response formats
           _buildQuickStat(
             'بازارات نشطة',
-            '${_insights?['active_bazaars'] ?? 0}/${_insights?['total_bazaars'] ?? 0}',
+            '${_insights?['active_bazaars'] ?? _insights?['quick_stats']?['active_bazaars'] ?? 0}/${_insights?['total_bazaars'] ?? _insights?['quick_stats']?['total_bazaars'] ?? 0}',
             AppColors.primary,
           ),
         ],

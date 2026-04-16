@@ -3,9 +3,12 @@
 بيدعم Arabic text normalization + better tokenization
 """
 import re
+import logging
 from langchain_core.documents import Document
 from rank_bm25 import BM25Okapi
 from config import TOP_K_RESULTS
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -132,7 +135,7 @@ class BM25Store:
         if self._tokenized:
             self._index = BM25Okapi(self._tokenized)
 
-        print(f"🔤 فهرس BM25 جاهز — {len(self._docs)} مستند (Arabic-normalized)")
+        logger.info(f"BM25 index ready — {len(self._docs)} documents (Arabic-normalized)")
 
     def search(self, query: str, top_k: int = TOP_K_RESULTS) -> list[tuple[Document, float]]:
         """بحث بالكلمات المفتاحية مع Arabic normalization."""

@@ -3,11 +3,14 @@
 يعتمد حصرياً على AWS Aurora pgvector لسرعة الأداء.
 بدون استهلاك للذاكرة أو بطء في إقلاع الـ Lambda (Zero Cold Start).
 """
+import logging
 from services.gemini_service import get_embeddings
 from memory.aws_memory import search_knowledge_pgvector
 from langchain_core.documents import Document
 from config import TOP_K_RESULTS
 from rag.corrective_rag import corrective_rag_pipeline
+
+logger = logging.getLogger(__name__)
 
 class ServerlessRetriever:
     """Retriever وهمي يحاكي الـ HybridRetriever القديم، لكنه متصل بـ pgvector فوراً"""
@@ -27,7 +30,7 @@ class ServerlessRetriever:
                 for r in results
             ]
         except Exception as e:
-            print(f"⚠️ pgvector search error: {e}")
+            logger.warning(f"pgvector search error: {e}")
             return []
 
 # Singleton instance
@@ -35,7 +38,7 @@ _retriever = ServerlessRetriever()
 
 async def initialize_rag():
     """في بيئة الـ Serverless لا نحتاج لتهيئة (In-Memory). البيانات في Aurora أصلاً!"""
-    print("✅ نظام RAG تمت تهيئته! (Serverless Native Aurora pgvector)")
+    logger.info("RAG engine initialized (Serverless Native Aurora pgvector)")
 
 def get_hybrid_retriever() -> ServerlessRetriever:
     return _retriever
@@ -69,5 +72,5 @@ async def incremental_update(documents: list) -> None:
     متروكة كـ Placeholder. في الإنتاج، رفع الملفات يكون عبر S3 Event لـ Lambda
     منفصلة تقوم بعمل Embed وحفظها في pgvector knowledge_chunks.
     """
-    print("⚠️ Incremental Update called. In AWS this should be handled by an S3 Trigger.")
+    logger.info("Incremental Update called. In AWS this should be handled by an S3 Trigger.")
     pass

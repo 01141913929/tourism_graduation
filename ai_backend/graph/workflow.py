@@ -3,6 +3,7 @@
 ملف خفيف — كل المنطق في nodes.py و edges.py
 ✅ يدعم Reflection Node (قابلة للتعطيل من config.py)
 """
+import logging
 from langgraph.graph import StateGraph, END
 from graph.state import AgentState
 from graph.nodes import (
@@ -18,6 +19,8 @@ from graph.nodes import (
 )
 from graph.edges import route_to_agent, get_agent_routing_map
 from config import ENABLE_REFLECTION
+
+logger = logging.getLogger(__name__)
 
 
 _compiled_graph = None
@@ -61,20 +64,20 @@ def create_workflow():
         for agent in agents:
             workflow.add_edge(agent, "reflection")
         workflow.add_edge("reflection", "build_response")
-        print("🔍 Reflection Node: مفعّلة")
+        logger.info("Reflection Node: enabled")
     else:
         for agent in agents:
             workflow.add_edge(agent, "build_response")
-        print("⏭️ Reflection Node: معطّلة")
+        logger.info("Reflection Node: disabled")
 
     # build_response → learn_preferences → END
     workflow.add_edge("build_response", "learn_preferences")
     workflow.add_edge("learn_preferences", END)
-    print("🧠 Learn Preferences Node: مفعّلة")
+    logger.info("Learn Preferences Node: enabled")
 
     # ============ تجميع ============
     graph = workflow.compile()
-    print("✅ جراف LangGraph جاهز!")
+    logger.info("LangGraph workflow compiled successfully")
     return graph
 
 

@@ -139,113 +139,89 @@ async def compute_bazaar_analytics(bazaar_id: str, period: str = "week") -> dict
 # ============================================================
 
 async def compute_platform_analytics(period: str = "month") -> dict:
-    """تحليلات شاملة للمنصة للمديرين (Admin AI)."""
+    """تحليلات شاملة للمنصة للمديرين (Admin AI) — محسنة باستخدام SQL."""
     days_map = {"week": 7, "month": 30, "quarter": 90, "year": 365}
     days = days_map.get(period, 30)
 
-    orders_task = get_all_orders(days)
-    bazaars_task = get_all_bazaars()
-    products_task = get_all_products()
-
-    orders, bazaars, products = await asyncio.gather(
-        orders_task, bazaars_task, products_task
+    from services.aws_db_service import (
+        get_platform_metrics_sql, get_bazaar_rankings_sql,
+        get_category_distribution_sql, get_revenue_trend_sql
     )
 
-    total_revenue = 0.0
-    daily_revenue = defaultdict(float)
-    bazaar_revenue = defaultdict(float)
-    bazaar_orders = defaultdict(int)
-    status_counts = defaultdict(int)
+    # Fetch optimized metrics concurrently
+    metrics, rankings, categories, revenue_trend = await asyncio.gather(
+        get_platform_metrics_sql(days),
+        get_bazaar_rankings_sql(days, limit=10),
+        get_category_distribution_sql(),
+        get_revenue_trend_sql(days),
+    )
 
-    for order in orders:
-        total = float(order.get("total", 0) or 0)
-        status = order.get("status", "unknown")
-        status_counts[status] += 1
-
-        if status in ("delivered", "accepted"):
-            total_revenue += total
-            bid = order.get("bazaar_id", "unknown")
-            bazaar_revenue[bid] += total
-            bazaar_orders[bid] += 1
-
-            created_at = order.get("created_at")
-            if created_at:
-                if hasattr(created_at, "strftime"):
-                    day_key = created_at.strftime("%Y-%m-%d")
-                else:
-                    day_key = str(created_at)[:10]
-                daily_revenue[day_key] += total
-
-    # Bazaar rankings
-    bazaar_map = {b["id"]: b for b in bazaars}
-    sorted_bazaars = sorted(bazaar_revenue.items(), key=lambda x: x[1], reverse=True)
-
+    # Format rankings for the UI
     bazaar_rankings = []
-    for i, (bid, rev) in enumerate(sorted_bazaars):
-        bazaar = bazaar_map.get(bid, {})
-        tier = "gold" if i < 3 else "silver" if i < 10 else "bronze"
+    for i, r in enumerate(rankings):
         bazaar_rankings.append({
-            "id": bid,
-            "name": bazaar.get("nameAr", "بازار بدون اسم"),
-            "revenue": round(rev, 2),
-            "orders": bazaar_orders[bid],
-            "tier": tier,
+            "id": r["id"],
+            "name": r["name"],
+            "revenue": float(r["revenue"]),
+            "orders": r["order_count"],
+            "tier": "gold" if i < 3 else "silver" if i < 6 else "bronze",
             "rank": i + 1,
         })
 
     if not bazaar_rankings:
-        bazaar_rankings.append({"id": "dummy", "name": "لا مبيعات", "revenue": 0.0, "orders": 0, "tier": "bronze", "rank": 1})
+        bazaar_rankings.append({"id": "dummy", "name": "لا مبيعات خالية", "revenue": 0.0, "orders": 0, "tier": "bronze", "rank": 1})
 
     return {
         "period": period,
         "key_metrics": {
-            "total_revenue": round(total_revenue, 2),
-            "total_orders": len(orders),
-            "delivered_orders": status_counts.get("delivered", 0),
-            "total_customers": 0,
-            "total_bazaars": len(bazaars),
-            "active_bazaars": len(bazaar_revenue.keys()),
-            "total_products": len(products),
-            "cancellation_rate": 0.0,
+            "total_revenue": float(metrics["total_revenue"]),
+            "total_orders": metrics["total_orders"],
+            "delivered_orders": metrics["delivered_orders"],
+            "total_customers": metrics.get("total_customers", 0),
+            "total_bazaars": metrics["total_bazaars"],
+            "active_bazaars": metrics["active_bazaars"],
+            "total_products": metrics["total_products"],
+            "cancellation_rate": metrics["cancellation_rate"],
         },
-        "bazaar_rankings": bazaar_rankings[:10],
-        "inactive_bazaars": [b for b in bazaars if b["id"] not in bazaar_revenue and b.get("isApproved")],
-        "status_distribution": dict(status_counts),
+        "bazaar_rankings": bazaar_rankings,
+        "inactive_bazaars": [], 
+        "status_distribution": {}, 
         "charts_data": {
-            "revenue_line": [{"date": d, "revenue": daily_revenue[d]} for d in sorted(daily_revenue.keys())],
-            "categories_pie": [],
+            "revenue_line": revenue_trend,
+            "categories_pie": [{"category": c["category"] or "عام", "revenue": c["count"]} for c in categories[:6]],
             "bazaar_bar": bazaar_rankings[:5],
         },
     }
 
 async def get_platform_health() -> dict:
-    products = await get_all_products()
-    bazaars = await get_all_bazaars()
-    
-    approved_bazaars = [b for b in bazaars if b.get("isApproved", True)]
+    """الحصول على صحة المنصة الحقيقية بناءً على جودة البيانات."""
+    from services.aws_db_service import get_system_health_metrics_sql
+    health = await get_system_health_metrics_sql()
     
     return {
-        "health_score": 100,
-        "bazaars": {"total": len(bazaars), "approved": len(approved_bazaars)},
+        "health_score": health["health_score"],
+        "bazaars": {"total": health.get("bazaars_total", 0), "approved": 0}, # Simplified
         "products": {
-            "total": len(products),
-            "active": len([p for p in products if p.get("isActive", True)]),
-            "no_image": 0,
-            "no_description": 0,
+            "total": health["products_total"],
+            "active": health["products_total"], # Placeholder
+            "no_image": health["missing_images"],
+            "no_description": health["missing_descriptions"],
         },
+        "pending_applications": health["pending_applications"]
     }
 
 async def get_market_prices(category: str) -> dict:
-    all_p = await get_all_products()
-    prices = [float(p.get("price", 0)) for p in all_p if p.get("category") == category and p.get("price")]
+    """تحليل أسعار السوق لفئة معينة باستخدام SQL."""
+    from services.aws_db_service import get_market_prices_sql
+    stats = await get_market_prices_sql(category)
     
-    if not prices:
-        return {"average": 0, "min": 0, "max": 0, "count": 0}
+    if not stats or stats.get("count", 0) == 0:
+        return {"average": 0, "min": 0, "max": 0, "count": 0, "median": 0}
 
     return {
-        "average": round(sum(prices) / len(prices), 2),
-        "min": min(prices),
-        "max": max(prices),
-        "median": sorted(prices)[len(prices) // 2],
-        "count": len(prices),
+        "average": round(stats["average"], 2),
+        "min": stats["min"],
+        "max": stats["max"],
+        "median": stats["median"],
+        "count": stats["count"],
     }

@@ -24,15 +24,20 @@ KNOWLEDGE_DIR = BASE_DIR / "knowledge"
 
 # --- API Keys ---
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")          # Tourist App
+GROQ_API_KEY_OWNER = os.getenv("GROQ_API_KEY2")   # Owner App
+GROQ_API_KEY_ADMIN = os.getenv("GROQ_API_KEY3")   # Admin Web
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
+LANGFUSE_SECRET_KEY = os.getenv("LANGFUSE_SECRET_KEY")
+LANGFUSE_PUBLIC_KEY = os.getenv("LANGFUSE_PUBLIC_KEY")
+LANGFUSE_BASE_URL = os.getenv("LANGFUSE_BASE_URL", "https://cloud.langfuse.com")
 
 # --- Model Config ---
 LLM_PROVIDER = os.getenv("LLM_PROVIDER", "groq")  # "groq" or "gemini"
 GEMINI_MODEL = os.getenv("GEMINI_MODEL", "gemini-2.5-pro")
 GROQ_MODEL = os.getenv("GROQ_MODEL", "openai/gpt-oss-120b")
 GROQ_FAST_MODEL = os.getenv("GROQ_FAST_MODEL", "openai/gpt-oss-20b")  # Fast model for routing/evaluation
-GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "models/gemini-embedding-001")
+GEMINI_EMBEDDING_MODEL = os.getenv("GEMINI_EMBEDDING_MODEL", "models/text-embedding-004")
 
 # --- Server Config ---
 HOST = os.getenv("HOST", "0.0.0.0")
@@ -51,7 +56,7 @@ SUMMARY_AFTER_MESSAGES = 15   # Summarize after this many (was 3 — too costly)
 
 # --- Agent Config ---
 MAX_TOOL_CALLS = 3             # Max tool calls per agent turn
-ENABLE_REFLECTION = True       # Enable for quality improvement
+ENABLE_REFLECTION = False      # Disable for faster RTT in production
 
 # --- Rate Limiting ---
 MAX_REQUESTS_PER_MINUTE = 15

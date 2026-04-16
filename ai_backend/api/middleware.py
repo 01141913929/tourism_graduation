@@ -3,12 +3,14 @@
 Rate Limiting + Request Logging + Error Handling
 """
 import time
-import asyncio
+import logging
 from collections import defaultdict
 from fastapi import Request, Response
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 from config import RATE_LIMIT_RPM
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -73,7 +75,8 @@ class RequestLoggingMiddleware(BaseHTTPMiddleware):
 
         # تلوين حسب الحالة
         emoji = "✅" if status < 400 else "⚠️" if status < 500 else "❌"
-        print(f"{emoji} {method} {path} → {status} ({duration}ms)")
+        log_fn = logger.info if status < 400 else logger.warning if status < 500 else logger.error
+        log_fn(f"{method} {path} → {status} ({duration}ms)")
 
         # إضافة headers مفيدة
         response.headers["X-Response-Time"] = f"{duration}ms"
@@ -93,7 +96,7 @@ class ErrorHandlingMiddleware(BaseHTTPMiddleware):
         try:
             return await call_next(request)
         except Exception as e:
-            print(f"❌ خطأ غير متوقع: {e}")
+            logger.error(f"Unhandled exception on {request.url.path}: {e}", exc_info=True)
             return JSONResponse(
                 status_code=500,
                 content={

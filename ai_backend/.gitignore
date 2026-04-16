@@ -1,9 +1,55 @@
+# ============================================================
+# Egyptian Tourism AI Backend — .gitignore
+# ============================================================
+
+# Environment & Secrets
 .env
-service_account.json
+*.json
+!package.json
+secrets/
+secrets/*.json
+
+# Python
 __pycache__/
 *.pyc
-.venv/
-chroma_db/
+*.pyo
 *.egg-info/
+.eggs/
+*.egg
+
+# Virtual Environment
+.venv/
+venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Legacy (must never be committed)
+ngrok.exe
+ngrok
+service_account.json
+chroma_db/
+
+# Testing
+.pytest_cache/
+htmlcov/
+.coverage
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate*
+terraform/*.tfplan
+terraform/terraform.tfvars
+terraform/.terraform.lock.hcl
+
+# Build
 dist/
 build/

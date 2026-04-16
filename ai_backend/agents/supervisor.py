@@ -10,11 +10,14 @@
 5. Multi-signal Scoring — بيجمع إشارات من مصادر متعددة
 """
 import re
+import logging
 import asyncio
 from graph.state import AgentState
 from services.gemini_service import get_llm
 from prompts.agent_prompts import SUPERVISOR_PROMPT
 from memory.working_memory import get_session, get_conversation_context
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -220,28 +223,28 @@ async def run_supervisor(state: AgentState) -> dict:
 
             if keyword_agent is None or keyword_agent == last_agent:
                 # متابعة مؤكدة → نفس الوكيل
-                print(f"🔁 متابعة → {last_agent} (follow-up detected)")
+                logger.info(f"Follow-up detected → {last_agent}")
                 return {"current_agent": last_agent, "last_agent_used": last_agent}
 
             # لو فيه keyword مختلف واضح → تغيير الوكيل
             if keyword_agent and keyword_agent != last_agent:
-                print(f"↪️ تغيير من {last_agent} → {keyword_agent} (new intent)")
+                logger.info(f"New intent: {last_agent} → {keyword_agent}")
                 return {"current_agent": keyword_agent, "last_agent_used": keyword_agent}
 
     # === الخطوة 2: كشف الإحباط ===
     if _detect_frustration(last_message):
         # لو محبط + موجود في وكيل → يفضل في نفس الوكيل مع ملاحظة
         if last_agent and last_agent != "assistant_agent":
-            print(f"😤 إحباط مكتشف — يبقى في {last_agent} مع تحسين الرد")
+            logger.info(f"Frustration detected — staying in {last_agent}")
             return {"current_agent": last_agent, "sentiment": "negative", "last_agent_used": last_agent}
         # لو مفيش وكيل سابق → personalization
-        print("😤 إحباط مكتشف → personalization_agent")
+        logger.info("Frustration detected → personalization_agent")
         return {"current_agent": "personalization_agent", "sentiment": "negative", "last_agent_used": "personalization_agent"}
 
     # === الخطوة 3: توجيه بالكلمات المفتاحية (سريع) ===
     keyword_agent = _keyword_routing(last_message)
     if keyword_agent:
-        print(f"⚡ توجيه سريع → {keyword_agent}")
+        logger.info(f"Keyword routing → {keyword_agent}")
         return {"current_agent": keyword_agent, "last_agent_used": keyword_agent}
 
     # === الخطوة 4: توجيه بالـ LLM (ذكي — آخر خيار) ===
@@ -276,21 +279,21 @@ async def run_supervisor(state: AgentState) -> dict:
         # استخراج اسم الوكيل
         agent = _extract_agent_name(text)
         if agent:
-            print(f"🤖 توجيه LLM → {agent}")
+            logger.info(f"LLM routing → {agent}")
             return {"current_agent": agent, "last_agent_used": agent}
 
     except asyncio.TimeoutError:
-        print("⏰ Supervisor LLM timeout — fallback")
+        logger.warning("Supervisor LLM timeout — using fallback")
     except Exception as e:
-        print(f"⚠️ Supervisor error: {e}")
+        logger.warning(f"Supervisor LLM error: {e}")
 
     # === Fallback النهائي ===
     # لو فيه وكيل سابق وبقاله أقل من 5 رسائل → يرجعله
     if last_agent and last_agent != "assistant_agent" and message_count < 5:
-        print(f"🔄 Fallback → {last_agent} (recent agent)")
+        logger.info(f"Fallback → {last_agent} (recent agent)")
         return {"current_agent": last_agent, "last_agent_used": last_agent}
 
-    print("💬 Fallback → assistant_agent")
+    logger.info("Fallback → assistant_agent")
     return {"current_agent": "assistant_agent", "last_agent_used": "assistant_agent"}
 
 

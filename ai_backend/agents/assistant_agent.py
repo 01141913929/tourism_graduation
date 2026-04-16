@@ -1,13 +1,16 @@
 """
 🧠 Assistant Agent — المساعد العام الذكي
 يجمع بين البحث في الإنترنت (Web Research) وإجابات الترحيب العامة (General Agent)
-✅ يدعم Tavily Tools بشكل اختياري حسب سؤاله 
+يدعم Tavily Tools بشكل اختياري حسب سؤاله
 """
+import logging
 from graph.state import AgentState
 from prompts.agent_prompts import ASSISTANT_AGENT_PROMPT
 from tools.web_tools import WEB_TOOLS
 from agents.tool_executor import run_agent_with_tools
 from langchain_core.messages import AIMessage
+
+logger = logging.getLogger(__name__)
 
 async def run_assistant_agent(state: AgentState) -> dict:
     messages = state.get("messages", [])
@@ -49,7 +52,7 @@ async def run_assistant_agent(state: AgentState) -> dict:
             agent_name="assistant_agent",
         )
     except Exception as e:
-        print(f"❌ Assistant agent error: {e}")
+        logger.error(f"Assistant agent error: {e}")
         response = "عذراً، لم أتمكن من الرد عليك في الوقت الحالي."
 
     return {

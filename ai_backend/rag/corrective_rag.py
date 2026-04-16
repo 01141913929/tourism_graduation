@@ -2,8 +2,11 @@
 🔄 Corrective RAG — نظام RAG تصحيحي (مع Query Rewriter)
 بحث هجين مع تقييم → إعادة صياغة ذكية → توسيع عربي → Web Fallback
 """
+import logging
 from langchain_core.documents import Document
 from config import RELEVANCE_THRESHOLD
+
+logger = logging.getLogger(__name__)
 
 
 async def corrective_rag_pipeline(query: str, hybrid_retriever,
@@ -55,7 +58,7 @@ async def corrective_rag_pipeline(query: str, hybrid_retriever,
                         result["method"] = "hybrid_rewritten"
                         result["rewritten"] = True
         except Exception as e:
-            print(f"⚠️ Query rewrite failed: {e}")
+            logger.warning(f"Query rewrite failed: {e}")
 
     # ============ الخطوة 3: توسيع عربي ============
     if result["score"] < RELEVANCE_THRESHOLD and len(result["documents"]) < 2:
@@ -76,7 +79,7 @@ async def corrective_rag_pipeline(query: str, hybrid_retriever,
                         result["method"] = "hybrid_expanded"
                         result["rewritten"] = True
         except Exception as e:
-            print(f"⚠️ Query expansion failed: {e}")
+            logger.warning(f"Query expansion failed: {e}")
 
     # ============ الخطوة 4: بحث ويب كخطة بديلة ============
     if not result["documents"]:
@@ -90,6 +93,6 @@ async def corrective_rag_pipeline(query: str, hybrid_retriever,
             ]
             result["score"] = 0.8
         except Exception as e:
-            print(f"⚠️ فشل بحث الويب: {e}")
+            logger.warning(f"Web search fallback failed: {e}")
 
     return result

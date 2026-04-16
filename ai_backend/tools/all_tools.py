@@ -282,8 +282,10 @@ async def remove_from_cart(item_index: int, user_id: str = "default") -> str:
     items = await db.get_cart_items(user_id)
     idx = item_index - 1
     if 0 <= idx < len(items):
-        pid = items[idx].get("productId", "")
-        await db.remove_cart_item(user_id, idx)
+        item = items[idx]
+        pid = item.get("productId", "")
+        item_doc_id = item.get("id") or f"{pid}_{item.get('selectedSize', '')}".strip("_")
+        await db.remove_cart_item(user_id, item_doc_id)
 
         product = await db.get_product_by_id(pid)
         name = product.get("nameAr", "") if product else f"المنتج المحذوف ({pid})"
@@ -415,21 +417,79 @@ async def get_conversation_history(user_id: str) -> str:
     return "📋 ملخصات المحادثات السابقة:\n" + "\n".join(result)
 
 
+@tool
+async def semantic_search_products(query: str, limit: int = 5) -> str:
+    """Semantic 'search by meaning' for products. 
+    Use this for vague queries like 'traditional gifts', 'stone items', or 'luxury souvenirs'
+    where keyword search might fail."""
+    from services.gemini_service import get_query_embeddings
+    from services.aws_db_service import search_products_vector
+    
+    embedder = get_query_embeddings()
+    embedding = await embedder.aembed_query(query)
+    products = await search_products_vector(embedding, limit)
+    
+    if not products:
+        return "لم يتم العثور على منتجات مطابقة دلالياً."
+
+    result_lines = [f"نتائج البحث الدلالي عن '{query}':\n"]
+    for i, p in enumerate(products, 1):
+        result_lines.append(_format_product_entry(i, p))
+    
+    return "\n".join(result_lines)
+
+
+@tool
+async def semantic_search_bazaars(query: str, limit: int = 3) -> str:
+    """Semantic 'search by meaning' for bazaars.
+    Use this to find bazaars based on their description or 'vibe'."""
+    from services.gemini_service import get_query_embeddings
+    from services.aws_db_service import search_bazaars_vector
+    
+    embedder = get_query_embeddings()
+    embedding = await embedder.aembed_query(query)
+    bazaars = await search_bazaars_vector(embedding, limit)
+    
+    if not bazaars:
+        return "لم يتم العثور على بازارات مطابقة دلالياً."
+
+    result_lines = ["🏪 بازارات مقترحة بناءً على طلبك:\n"]
+    for i, b in enumerate(bazaars, 1):
+        status = "مفتوح ✅" if b.get("isOpen") else "مغلق ❌"
+        result_lines.append(
+            f"{i}. 🏪 **{b.get('nameAr', '')}**\n"
+            f"   📝 {b.get('descriptionAr', '')}\n"
+            f"   📍 {b.get('address', '')}\n"
+            f"   {status}\n"
+            f"   🆔 [ID:{b.get('id', '')}]"
+        )
+    return "\n".join(result_lines)
+
+
+@tool
+async def semantic_search_knowledge(query: str) -> str:
+    """Search the official Egyptian tourism knowledge base and history 
+    using semantic vector search (RAG). Use this for historical questions, 
+    travel tips, or museum info."""
+    from rag.engine import search_knowledge
+    return await search_knowledge(query)
+
+
 # ============================================================
 # Tool Collections for each agent
 # ============================================================
 
 PRODUCT_TOOLS = [
-    search_products, get_product_details, get_featured_products,
-    get_products_by_category, compare_products,
+    search_products, semantic_search_products, get_product_details, 
+    get_featured_products, get_products_by_category, compare_products,
 ]
 
 ARTIFACT_TOOLS = [
-    get_artifact_info, search_artifacts,
+    get_artifact_info, search_artifacts, semantic_search_knowledge,
 ]
 
 BAZAAR_TOOLS = [
-    get_nearby_bazaars, get_bazaar_details, get_bazaar_products,
+    get_nearby_bazaars, get_bazaar_details, get_bazaar_products, semantic_search_bazaars,
 ]
 
 CART_TOOLS = [

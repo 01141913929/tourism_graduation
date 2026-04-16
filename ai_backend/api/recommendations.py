@@ -6,6 +6,7 @@
 """
 import asyncio
 import json
+import logging
 from fastapi import APIRouter, Query
 from fastapi.responses import StreamingResponse
 from services.aws_db_service import (
@@ -14,6 +15,8 @@ from services.aws_db_service import (
 from services.gemini_service import get_fast_llm
 
 router = APIRouter(prefix="/api", tags=["Recommendations"])
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -170,7 +173,7 @@ async def _llm_recommendations(
         return result_products
 
     except Exception as e:
-        print(f"⚠️ LLM recommendations failed: {e}")
+        logger.warning(f"LLM recommendations failed: {e}")
         return []
 
 
@@ -430,7 +433,7 @@ async def stream_recommendations(
             yield "data: [DONE]\n\n"
 
         except Exception as e:
-            print(f"⚠️ Streaming Error: {e}")
+            logger.warning(f"Streaming Error: {e}")
             yield f"data: {json.dumps({'error': str(e)})}\n\n"
             yield "data: [DONE]\n\n"
 

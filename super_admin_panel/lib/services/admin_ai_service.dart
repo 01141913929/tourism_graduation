@@ -5,10 +5,10 @@ import 'package:http/http.dart' as http;
 
 /// 🤖 Admin AI Service — التواصل مع API الأدمن
 class AdminAIService {
-  static String _baseUrl = 'https://oozy-laboringly-taliyah.ngrok-free.dev/api/admin/ai';
+  static String _baseUrl = 'https://al5bhgldsf.execute-api.us-east-1.amazonaws.com/prod/api/admin/ai';
 
   static void setBaseUrl(String url) {
-    _baseUrl = 'https://oozy-laboringly-taliyah.ngrok-free.dev/api/admin/ai';
+    _baseUrl = 'https://al5bhgldsf.execute-api.us-east-1.amazonaws.com/prod/api/admin/ai';
   }
 
   // ============================================================

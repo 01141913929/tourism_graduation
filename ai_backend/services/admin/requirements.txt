@@ -1,0 +1,20 @@
+# Core framework
+fastapi==0.115.6
+mangum==0.17.0
+pydantic==2.10.4
+python-dotenv==1.0.1
+
+# AI & LLM
+langchain==0.3.20
+langchain-google-genai==2.0.8
+langchain-groq==0.3.2
+langgraph==0.2.62
+langchain-community==0.3.15
+
+# Core DB Dependencies
+boto3>=1.35.0
+psycopg2-binary>=2.9.9
+
+# Excluded explicitly because it's not needed by admin:
+# rank-bm25 (used only by RAG/tourist)
+# websockets (used only by tourist realtime streaming)

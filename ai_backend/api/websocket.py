@@ -108,10 +108,13 @@ async def websocket_chat(websocket: WebSocket, session_id: str):
 
             try:
                 # 🌟 Real Streaming using `astream_events` 🌟
-                # بنستهلك الأحداث فور توليدها من الـ Agent المختار
+                from core.langfuse_config import get_langfuse_handler
+                langfuse_handler = get_langfuse_handler()
+                config = {"callbacks": [langfuse_handler]} if langfuse_handler else {}
+                
                 final_result = None
                 
-                async for event in graph.astream_events(initial_state, version="v2"):
+                async for event in graph.astream_events(initial_state, version="v2", config=config):
                     # استقبال تدفق النصوص من الموديل الحي (LLM)
                     if event["event"] == "on_chat_model_stream":
                         chunk = event["data"]["chunk"].content

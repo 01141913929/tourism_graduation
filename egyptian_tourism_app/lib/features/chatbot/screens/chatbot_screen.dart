@@ -203,10 +203,11 @@ class _ChatbotScreenState extends State<ChatbotScreen>
 
     // === محاولة البث أولاً ===
     bool streamWorked = false;
+    bool streamDone = false;
 
     try {
       await for (final event in _chatService!.sendMessageStream(text.trim())) {
-        if (!mounted) return;
+        if (!mounted || streamDone) break;
 
         switch (event.type) {
           case AiStreamEventType.status:
@@ -248,9 +249,10 @@ class _ChatbotScreenState extends State<ChatbotScreen>
               detectedSentiment,
               quickActions,
             );
+            streamDone = true;
             break;
 
-          case AiStreamEventType.error:
+            case AiStreamEventType.error:
             if (!streamWorked) {
               _removeMessage(aiMessageId);
               final restResponse = await _chatService!.sendMessage(text.trim());
@@ -270,6 +272,8 @@ class _ChatbotScreenState extends State<ChatbotScreen>
                 );
               });
             }
+            
+            streamDone = true;
             break;
         }
       }

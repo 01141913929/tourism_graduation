@@ -2,6 +2,7 @@
 🇪🇬 Egyptian Tourism AI — Main Application
 Entry point + App Factory
 """
+import logging
 import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +23,8 @@ from api.middleware import (
     ErrorHandlingMiddleware,
 )
 
+logger = logging.getLogger(__name__)
+
 
 # ============================================================
 # Lifecycle — التهيئة والإغلاق
@@ -30,8 +33,8 @@ from api.middleware import (
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """تهيئة كل الأنظمة عند بدء السيرفر."""
-    print("🚀 جاري تشغيل Egyptian Tourism AI Backend...")
-    print("=" * 50)
+    logger.info("Starting Egyptian Tourism AI Backend...")
+    logger.info("=" * 50)
 
     # 1. التحقق من الإعدادات
     validate_config()
@@ -42,16 +45,16 @@ async def lifespan(app: FastAPI):
     # 4. تجميع الجراف
     get_workflow()
 
-    print("=" * 50)
-    print("✅ كل الأنظمة جاهزة!")
-    print(f"🌐 السيرفر شغال على: http://{HOST}:{PORT}")
-    print(f"📖 التوثيق: http://{HOST}:{PORT}/docs")
-    print(f"🔌 WebSocket: ws://{HOST}:{PORT}/ws/chat/{{session_id}}")
-    print("=" * 50)
+    logger.info("=" * 50)
+    logger.info("All systems ready!")
+    logger.info(f"Server running on: http://{HOST}:{PORT}")
+    logger.info(f"Docs: http://{HOST}:{PORT}/docs")
+    logger.info(f"WebSocket: ws://{HOST}:{PORT}/ws/chat/{{session_id}}")
+    logger.info("=" * 50)
 
     yield
 
-    print("👋 السيرفر بيقفل...")
+    logger.info("Server shutting down...")
 
 
 # ============================================================
@@ -94,28 +97,37 @@ async def root():
         "name": "🇪🇬 Egyptian Tourism AI",
         "version": "2.0.0",
         "status": "running",
-        "agents": [
-            "supervisor", "product", "history", "cart",
-            "tour_guide", "web_research", "personalization", "general",
-            "owner_assistant", "admin_assistant", "moderation",
-        ],
+        "architecture": "Consolidated Multi-Agent (LangGraph)",
+        "agents": {
+            "graph_agents": [
+                "supervisor",
+                "commerce_agent",
+                "explorer_agent",
+                "assistant_agent",
+                "personalization_agent",
+            ],
+            "service_agents": [
+                "owner_assistant_agent",
+                "admin_assistant_agent",
+                "moderation_agent",
+            ],
+        },
         "features": [
-            "Multi-Agent System",
-            "3-Layer Memory",
-            "Hybrid RAG (BM25 + Vector)",
-            "Smart Caching",
-            "SSE Streaming",
-            "Fallback Chain (Groq → Gemini → Emergency)",
-            "Rich Cards",
+            "Multi-Agent LangGraph Orchestration",
+            "3-Layer Memory (Working + Episodic + Semantic)",
+            "RAG with Aurora pgvector (HNSW Indexes)",
+            "Corrective RAG Pipeline (Rewrite + Expand + Web Fallback)",
+            "Smart Response Caching",
+            "SSE Streaming & WebSocket Streaming",
+            "LLM Fallback Chain (Groq → Gemini → Emergency)",
+            "Rich Cards & Context Hand-off",
             "Conversation Summarization",
-            "Sentiment Analysis",
+            "Keyword-based Sentiment Analysis",
             "Proactive Suggestions",
-            "WebSocket Streaming",
             "Owner AI Assistant (8 APIs)",
             "Admin AI Assistant (7 APIs)",
             "AI Content Moderation",
             "AI Analytics & Forecasting",
-            "AI Business Intelligence",
         ],
     }
 

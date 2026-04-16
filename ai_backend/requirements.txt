@@ -1,3 +1,7 @@
+# ============================================================
+# 🇪🇬 Egyptian Tourism AI Backend — Dependencies
+# ============================================================
+
 # Core Framework
 fastapi==0.115.6
 uvicorn[standard]==0.34.0
@@ -7,15 +11,21 @@ pydantic==2.10.4
 # AI & LLM
 langchain==0.3.20
 langchain-google-genai==2.0.8
+langchain-groq==0.3.2
 langgraph==0.2.62
+langfuse>=2.50.0
 langchain-community==0.3.15
 
-# RAG
-rank-bm25==0.2.2
-
 # Web Search
-langchain-tavily==0.1.6
+tavily-python==0.5.0
+
+# AWS & Firebase
+boto3>=1.35.0
+psycopg2-binary>=2.9.9
+firebase-admin>=6.5.0
 
 # Utilities
 websockets==14.1
 python-multipart==0.0.20
+rank-bm25>=0.2.2
+mangum==0.17.0

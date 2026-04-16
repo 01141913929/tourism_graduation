@@ -1,10 +1,13 @@
 """
 📝 Episodic Memory — الذاكرة العرضية (متوسطة المدى)
-بتخزن ملخصات المحادثات السابقة في Firestore.
+بتخزن ملخصات المحادثات السابقة في AWS DynamoDB.
 بعد كل محادثة طويلة، الـ AI بيلخص الجلسة ويحفظها.
 """
+import logging
 from services.gemini_service import get_llm
 from services import aws_db_service as db
+
+logger = logging.getLogger(__name__)
 
 
 # ============================================================
@@ -12,7 +15,7 @@ from services import aws_db_service as db
 # ============================================================
 
 async def summarize_conversation(messages_text: str, session_id: str) -> str:
-    """تلخيص محادثة كاملة باستخدام Gemini."""
+    """تلخيص محادثة كاملة باستخدام LLM."""
     if not messages_text or len(messages_text.strip()) < 50:
         return ""
 
@@ -30,7 +33,7 @@ async def summarize_conversation(messages_text: str, session_id: str) -> str:
         response = await llm.ainvoke(prompt)
         return response.content.strip()
     except Exception as e:
-        print(f"⚠️ خطأ في تلخيص المحادثة: {e}")
+        logger.warning(f"خطأ في تلخيص المحادثة: {e}")
         return ""
 
 
@@ -54,7 +57,7 @@ async def extract_topics(messages_text: str) -> list[str]:
         topics = [t.strip() for t in response.content.strip().split("\n") if t.strip()]
         return topics[:5]  # أقصى 5 مواضيع
     except Exception as e:
-        print(f"⚠️ خطأ في استخراج المواضيع: {e}")
+        logger.warning(f"خطأ في استخراج المواضيع: {e}")
         return []
 
 
@@ -66,22 +69,19 @@ async def save_episode(user_id: str, session_id: str,
                        summary: str, topics: list[str],
                        sentiment: str = "neutral",
                        message_count: int = 0):
-    """حفظ حلقة محادثة في Firestore."""
+    """حفظ حلقة محادثة في DynamoDB."""
     if not user_id or not summary:
         return
 
     try:
-        from datetime import datetime
-        # حفظ الملخص كحلقة
         await db.save_conversation_summary(user_id, summary)
-
-        print(f"💾 تم حفظ حلقة ذاكرة للمستخدم {user_id[:8]} في AWS DynamoDB...")
+        logger.info(f"تم حفظ حلقة ذاكرة للمستخدم {user_id[:8]}...")
     except Exception as e:
-        print(f"⚠️ خطأ في حفظ الحلقة: {e}")
+        logger.warning(f"خطأ في حفظ الحلقة: {e}")
 
 
 async def load_recent_episodes(user_id: str, limit: int = 5) -> list[dict]:
-    """تحميل آخر N حلقات محادثة."""
+    """تحميل آخر N حلقات محادثة من DynamoDB."""
     if not user_id:
         return []
 
@@ -89,7 +89,7 @@ async def load_recent_episodes(user_id: str, limit: int = 5) -> list[dict]:
         summaries = await db.get_conversation_summaries(user_id, limit)
         return [{"summary": s} for s in summaries]
     except Exception as e:
-        print(f"⚠️ خطأ في تحميل الحلقات: {e}")
+        logger.warning(f"خطأ في تحميل الحلقات: {e}")
         return []
 
 
@@ -120,14 +120,12 @@ async def finalize_session(user_id: str, session_id: str,
         return ""
 
     try:
-        # تلخيص المحادثة
         summary = await summarize_conversation(messages_text, session_id)
         if not summary:
             return ""
 
         topics = await extract_topics(messages_text)
 
-        # حفظ الحلقة
         await save_episode(
             user_id=user_id,
             session_id=session_id,
@@ -137,8 +135,8 @@ async def finalize_session(user_id: str, session_id: str,
             message_count=message_count,
         )
 
-        print(f"📝 تم تلخيص وحفظ الجلسة: {summary[:80]}...")
+        logger.info(f"تم تلخيص وحفظ الجلسة: {summary[:80]}...")
         return summary
     except Exception as e:
-        print(f"⚠️ خطأ في إنهاء الجلسة: {e}")
+        logger.warning(f"خطأ في إنهاء الجلسة: {e}")
         return ""

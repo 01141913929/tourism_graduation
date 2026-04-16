@@ -49,24 +49,21 @@ async def api_admin_chat_stream(request: AdminChatRequest):
 
     async def generate_events():
         try:
-            # Status: Thinking
-            yield f"data: {json.dumps({'type': 'status', 'status': 'thinking'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'status', 'status': 'thinking', 'agent': 'خبير ذكاء الأعمال'}, ensure_ascii=False)}\n\n"
 
-            # Execute ReAct agent directly as event stream
             from agents.admin_assistant_agent import ADMIN_TOOLS, ADMIN_SYSTEM_MSG
             from langgraph.prebuilt import create_react_agent
             from langchain_core.messages import HumanMessage
             from services.gemini_service import get_llm
             
-            llm = get_llm(temperature=0.3)
+            # Use same settings as admin_chat for consistency
+            llm = get_llm(temperature=0.2, app_id="admin")
             agent = create_react_agent(llm, ADMIN_TOOLS, state_modifier=ADMIN_SYSTEM_MSG)
-            prompt_str = f"سياق إضافي: {request.context}\n\nسؤال المدير: {request.message}"
+            prompt_str = f"سياق إضافي من النظام: {request.context}\n\nسؤال المدير التنفيذي: {request.message}"
             
-            # Start generating
             yield f"data: {json.dumps({'type': 'status', 'status': 'generating'}, ensure_ascii=False)}\n\n"
 
             final_text = ""
-            # Stream events natively from LangGraph
             async for event in agent.astream_events({"messages": [HumanMessage(content=prompt_str)]}, version="v2"):
                 if event["event"] == "on_chat_model_stream":
                     chunk_text = event["data"]["chunk"].content
@@ -77,24 +74,33 @@ async def api_admin_chat_stream(request: AdminChatRequest):
                 
                 elif event["event"] == "on_tool_start":
                     tool_name = event["name"]
-                    yield f"data: {json.dumps({'type': 'status', 'status': f'جاري جلب إحصائيات: {tool_name}...'}, ensure_ascii=False)}\n\n"
+                    yield f"data: {json.dumps({'type': 'status', 'status': f'جاري تحليل البيانات عبر ({tool_name})...'}, ensure_ascii=False)}\n\n"
                     
-            # After full generation, we must extract JSON if it exists embedded in final_text, or just serve final_text.
-            # Usually ReAct outputs plain markdown due to custom prompt, but we requested JSON.
-            # Let's cleanly parse it
-            from utils.json_parser import parse_json_response
-            parsed = parse_json_response(final_text)
+            # Professional parsing
+            from agents.admin_assistant_agent import _parse_json_response
+            parsed = _parse_json_response(final_text, {"quick_actions": ["أداء المنصة", "صحة النظام"]})
             
-            if parsed and isinstance(parsed, dict):
-                quick_actions = parsed.get("quick_actions", [])
-            else:
-                quick_actions = ["تحديث البيانات", "أفضل البازارات أداءً"]
-                
-            yield f"data: {json.dumps({'type': 'done', 'quick_actions': quick_actions, 'charts_data': None, 'data_tables': None}, ensure_ascii=False)}\n\n"
+            done_data = {
+                'type': 'done', 
+                'quick_actions': parsed.get('quick_actions', []),
+                'sentiment': parsed.get('sentiment', 'neutral'),
+                'full_json': parsed
+            }
+            yield f"data: {json.dumps(done_data, ensure_ascii=False)}\n\n"
 
         except Exception as e:
             print(f"⚠️ Stream Admin Chat Error: {e}")
-            yield f"data: {json.dumps({'type': 'error', 'content': 'حدثت مشكلة مفاجئة! برجاء المحاولة لاحقاً.'}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'type': 'error', 'content': 'نعتذر، حدث خلل في معالجة البيانات.'}, ensure_ascii=False)}\n\n"
+
+    return StreamingResponse(
+        generate_events(),
+        media_type="text/event-stream",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",
+        },
+    )
 
     return StreamingResponse(
         generate_events(),

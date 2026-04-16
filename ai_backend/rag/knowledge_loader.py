@@ -1,8 +1,11 @@
 """
 📚 Knowledge Loader — تحميل ملفات قاعدة المعرفة (Markdown)
 """
+import logging
 from langchain_core.documents import Document
 from config import KNOWLEDGE_DIR
+
+logger = logging.getLogger(__name__)
 
 
 def load_knowledge_files() -> list[Document]:
@@ -11,7 +14,7 @@ def load_knowledge_files() -> list[Document]:
     knowledge_dir = KNOWLEDGE_DIR
 
     if not knowledge_dir.exists():
-        print("⚠️ مجلد المعرفة غير موجود، تم التخطي.")
+        logger.warning("Knowledge directory not found, skipping.")
         return docs
 
     for md_file in knowledge_dir.glob("*.md"):
@@ -27,5 +30,5 @@ def load_knowledge_files() -> list[Document]:
             "file": md_file.name,
         }))
 
-    print(f"📚 تم تحميل {len(docs)} ملف معرفة")
+    logger.info(f"Loaded {len(docs)} knowledge files")
     return docs

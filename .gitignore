@@ -1,27 +1,25 @@
-# Miscellaneous
-*.class
-*.log
-*.lock
-*.pyc
-*.swp
-.DS_Store
-.atom/
-.buildlog/
-.history
-.svn/
+# =========================
+# Security & Environment Variables
+# =========================
+.env
+service_account.json
+*.pem
+*.key
 
-# IntelliJ related
-*.iml
-*.ipr
-*.iws
-.idea/
+# =========================
+# Python & AI Backend
+# =========================
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+chroma_db/
+*.sqlite3
 
-# The .vscode folder contains launch configuration and tasks you configure in
-# VS Code which you may wish to be included in version control, so this line
-# is commented out by default.
-#.vscode/
-
+# =========================
 # Flutter/Dart/Pub related
+# =========================
 **/doc/api/
 .dart_tool/
 .pub-cache/
@@ -38,16 +36,43 @@ ios/Runner/GeneratedPluginRegistrant.*
 android/Flutter/build/
 android/app/libs/
 android/app/src/main/assets/
+android/.gradle/
 
+# =========================
 # Node modules
+# =========================
 node_modules/
 dist/
 coverage/
 
+# =========================
 # Firebase
+# =========================
 .firebase/
 firebase-debug.log
 firebaserc
 
-# Environment variables
-.env
+# =========================
+# IDEs & Editors
+# =========================
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# VS Code
+#.vscode/
+
+# =========================
+# Miscellaneous OS Files
+# =========================
+*.class
+*.log
+*.lock
+*.swp
+.DS_Store
+.atom/
+.buildlog/
+.history
+.svn/
